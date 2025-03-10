@@ -1,4 +1,4 @@
-import { User } from '@models/user'
+import { UserInfo } from '@models/user-info'
 
 export interface Ride {
   id: string
@@ -8,9 +8,11 @@ export interface Ride {
   availableSeats: number
   price: number
   departureDate: Date
-  passengers: User[]
-  driver: User
+  passengers: UserInfo[]
+  driver: UserInfo
   deletedAt: Date | null
   status?: 'active' | 'canceled' | 'completed'
   chatId: string
+  createdAt: Date
+  updatedAt: Date
 }
