@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --require tsconfig-paths/register --respawn src/index.ts",
-    "start": "node build/index.js",
+    "start": "node -r module-alias/register build/index.js",
     "lint": "ts-standard",
     "tsc": "tsc",
-    "build": "tsc",
+    "build": "tsc && cp -r src/config/*.json build/config/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -23,8 +23,14 @@
   "dependencies": {
     "express": "4.21.2",
     "firebase-admin": "13.1.0",
+    "module-alias": "2.2.3",
     "ts-standard": "12.0.2",
     "zod": "3.24.2"
+  },
+  "_moduleAliases": {
+    "@models": "build/models",
+    "@middlewares": "build/middlewares",
+    "@utils": "build/utils"
   },
   "eslintConfig": {
     "parserOptions": {
