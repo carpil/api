@@ -1,13 +1,158 @@
 import express from 'express'
+import { authenticate, AuthRequest } from '@middlewares/auth.middleware'
+import { firestore } from 'config/firebase'
+import { Ride } from '@models/ride'
+import { RideRequest } from '@models/ride-request'
+import { User } from '@models/user'
+import { validateRide } from 'schemas/ride'
+import { UserInfo } from '@models/user-info'
 
 const app = express()
 app.use(express.json())
 
-const PORT = 3000
+const PORT = process.env.PORT ?? 8080
 
-app.get('/', (_req, res) => {
-  console.log('here')
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000 // 1 hour in milliseconds
+const MAX_RIDES_PER_HOUR = 5
+const MAX_ACTIVE_RIDES = 2
+
+// In-memory rate limiting store (consider using Redis for production)
+const rateLimitStore = new Map<string, { count: number, timestamp: number }>()
+
+app.get('/', async (_req, res) => {
   res.send('Welcome to Carpil')
+})
+
+app.get('/rides/drivers', async (_req, res) => {
+  const driverRidesSnapshot = await firestore
+    .collection('rides')
+    .get()
+
+  const rides: Ride[] = driverRidesSnapshot.docs.map((doc) => {
+    const ride = doc.data() as Ride
+    ride.departureDate = doc.data().departureDate.toDate()
+    return ride
+  })
+  res.json({ rides })
+})
+
+app.get('/rides/passengers', async (_req, res) => {
+  const passengerRidesSnapshot = await firestore
+    .collection('ride_requests')
+    .get()
+
+  const rides: RideRequest[] = passengerRidesSnapshot.docs.map((doc) => {
+    const ride = doc.data() as RideRequest
+    ride.deletedAt = doc.data().deletedAt?.toDate()
+    ride.departureDate = doc.data().departureDate.toDate()
+    return ride
+  })
+
+  res.json({ rides })
+})
+
+app.post('/rides', authenticate, async (req: AuthRequest, res) => {
+  const rideRequest = validateRide(req.body)
+  if (!rideRequest.success) {
+    res.status(400).json({ message: rideRequest.error.message })
+    return
+  }
+
+  // get driver user info
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  // Check rate limiting
+  const now = Date.now()
+  const userRateLimit = rateLimitStore.get(currentUserId)
+
+  if (userRateLimit != null) {
+    if (now - userRateLimit.timestamp > RATE_LIMIT_WINDOW) {
+      // Reset if window has passed
+      rateLimitStore.set(currentUserId, { count: 1, timestamp: now })
+    } else if (userRateLimit.count >= MAX_RIDES_PER_HOUR) {
+      res.status(429).json({
+        message: 'Rate limit exceeded. Please wait before creating more rides.',
+        retryAfter: Math.ceil((RATE_LIMIT_WINDOW - (now - userRateLimit.timestamp)) / 1000)
+      })
+      return
+    } else {
+      // Increment count
+      userRateLimit.count++
+    }
+  } else {
+    // First request in the window
+    rateLimitStore.set(currentUserId, { count: 1, timestamp: now })
+  }
+
+  // Check active rides
+  const activeRidesSnapshot = await firestore
+    .collection('rides')
+    .where('driver.id', '==', currentUserId)
+    .where('status', '==', 'active')
+    .where('deletedAt', '==', null)
+    .get()
+
+  if (activeRidesSnapshot.size >= MAX_ACTIVE_RIDES) {
+    res.status(400).json({
+      message: `You cannot have more than ${MAX_ACTIVE_RIDES} active rides at the same time.`
+    })
+    return
+  }
+
+  const driverUserRef = await firestore.collection('users').doc(currentUserId).get()
+  if (!driverUserRef.exists) {
+    res.status(404).json({ message: 'Driver not found' })
+    return
+  }
+
+  const driverUser = driverUserRef.data() as User
+  const driverUserInfo: UserInfo = {
+    id: driverUser.id,
+    name: driverUser.name,
+    profilePicture: driverUser.profilePicture
+  }
+
+  let ride: Ride = {
+    ...rideRequest.data,
+    driver: driverUserInfo,
+    deletedAt: null,
+    status: 'active',
+    chatId: '',
+    passengers: [],
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+
+  // save ride to firestore
+  const rideRef = firestore.collection('rides').doc()
+  ride = {
+    ...ride,
+    id: rideRef.id
+  }
+  const result = await rideRef.set(ride)
+  if (result.writeTime == null) {
+    res.status(500).json({ message: 'Failed to save ride' })
+    return
+  }
+
+  res.json({ ride })
+})
+
+app.get('/users/:id', authenticate, async (_req, res) => {
+  const userId = _req.params.id
+
+  const userRef = await firestore.collection('users').doc(userId).get()
+  if (!userRef.exists) {
+    res.status(404).json({ message: 'User not found' })
+    return
+  }
+  const user = userRef.data() as User
+  res.json({ user })
 })
 
 app.listen(PORT, () => {
