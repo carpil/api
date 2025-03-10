@@ -1,9 +1,11 @@
+import { cert } from 'firebase-admin/app'
 import admin from 'firebase-admin'
-import serviceAccountKey from './carpil-firebase-config.json'
+
+const firebaseConfig = process.env.FIREBASE_CONFIG ?? ''
 
 if (admin.apps.length === 0) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccountKey as admin.ServiceAccount)
+    credential: cert(JSON.parse(firebaseConfig))
   })
 }
 
