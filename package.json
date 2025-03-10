@@ -8,7 +8,7 @@
     "start": "node -r module-alias/register build/index.js",
     "lint": "ts-standard",
     "tsc": "tsc",
-    "build": "tsc && cp -r src/config/*.json build/config/",
+    "build": "tsc && mkdir -p build/config && cp src/config/*.json build/config/ || true",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
