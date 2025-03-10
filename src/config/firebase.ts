@@ -3,8 +3,6 @@ import admin from 'firebase-admin'
 
 const firebaseConfig = process.env.FIREBASE_CONFIG ?? ''
 
-console.log({ firebaseConfig })
-
 if (admin.apps.length === 0) {
   admin.initializeApp({
     credential: cert(JSON.parse(firebaseConfig))
