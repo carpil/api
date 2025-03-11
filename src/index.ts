@@ -1,11 +1,15 @@
 import express from 'express'
+import dotenv from 'dotenv'
+
 import { authenticate, AuthRequest } from '@middlewares/auth.middleware'
 import { firestore } from 'config/firebase'
 import { Ride } from '@models/ride'
 import { RideRequest } from '@models/ride-request'
 import { User } from '@models/user'
-import { validateRide } from 'schemas/ride'
 import { UserInfo } from '@models/user-info'
+import { validateRide } from 'schemas/ride'
+
+dotenv.config()
 
 const app = express()
 app.use(express.json())
@@ -35,6 +39,19 @@ app.get('/rides/drivers', async (_req, res) => {
     return ride
   })
   res.json({ rides })
+})
+
+app.get('/rides/drivers/:id', authenticate, async (req, res) => {
+  const rideId = req.params.id
+
+  const rideRef = await firestore.collection('rides').doc(rideId).get()
+  if (!rideRef.exists) {
+    res.status(404).json({ message: 'Ride not found' })
+    return
+  }
+
+  const ride = rideRef.data() as Ride
+  res.json({ ride })
 })
 
 app.get('/rides/passengers', async (_req, res) => {
