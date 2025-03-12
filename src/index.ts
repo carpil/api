@@ -229,7 +229,6 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
   // Update ride's passenger list
   await firestore.collection('rides').doc(rideId).update({
     passengers: FieldValue.arrayUnion(passengerUserInfo),
-    availableSeats: ride.availableSeats - 1,
     updatedAt: new Date()
   })
 
