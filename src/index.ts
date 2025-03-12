@@ -8,6 +8,7 @@ import { RideRequest } from '@models/ride-request'
 import { User } from '@models/user'
 import { UserInfo } from '@models/user-info'
 import { validateRide } from 'schemas/ride'
+import { FieldValue } from 'firebase-admin/firestore'
 
 dotenv.config()
 
@@ -174,6 +175,65 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
   }
 
   res.json({ ride })
+})
+
+app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
+  const rideId = req.params.id
+
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const rideRef = await firestore.collection('rides').doc(rideId).get()
+  if (!rideRef.exists) {
+    res.status(404).json({ message: 'Ride not found' })
+    return
+  }
+
+  const ride = rideRef.data() as Ride
+  if (ride.driver.id === currentUserId) {
+    res.status(400).json({ message: 'You cannot join your own ride' })
+    return
+  }
+
+  if (ride.status !== 'active') {
+    res.status(400).json({ message: 'Ride is not active' })
+    return
+  }
+
+  if (ride.availableSeats <= 0) {
+    res.status(400).json({ message: 'No available seats' })
+    return
+  }
+
+  if (ride.passengers.some((passenger) => passenger.id === currentUserId)) {
+    res.status(400).json({ message: 'You are already a passenger on this ride' })
+    return
+  }
+
+  const passengerUserRef = await firestore.collection('users').doc(currentUserId).get()
+  if (!passengerUserRef.exists) {
+    res.status(404).json({ message: 'Passenger not found' })
+    return
+  }
+
+  const passengerUser = passengerUserRef.data() as User
+  const passengerUserInfo: UserInfo = {
+    id: passengerUser.id,
+    name: passengerUser.name,
+    profilePicture: passengerUser.profilePicture
+  }
+
+  // Update ride's passenger list
+  await firestore.collection('rides').doc(rideId).update({
+    passengers: FieldValue.arrayUnion(passengerUserInfo),
+    availableSeats: ride.availableSeats - 1,
+    updatedAt: new Date()
+  })
+
+  res.json({ message: 'Successfully joined the ride' })
 })
 
 app.get('/users/:id', authenticate, async (_req, res) => {
