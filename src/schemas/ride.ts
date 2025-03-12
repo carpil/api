@@ -4,12 +4,12 @@ import { MAXIMUM_NAME_LENGTH, MAXIMUM_RIDE_PRICE, MAXIMUM_SEATS } from 'utils/co
 const locationSchema = z.object({
   id: z.string(),
   name: z.object({
-    primary: z.string().min(1).max(MAXIMUM_NAME_LENGTH),
-    secondary: z.string().min(1).max(MAXIMUM_NAME_LENGTH)
+    primary: z.string().min(1).max(MAXIMUM_NAME_LENGTH, { message: `Name must be less than ${MAXIMUM_NAME_LENGTH} characters` }),
+    secondary: z.string().min(1).max(MAXIMUM_NAME_LENGTH, { message: `Name must be less than ${MAXIMUM_NAME_LENGTH} characters` })
   }),
   location: z.object({
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180)
+    lat: z.number().min(-90).max(90, { message: 'Latitude must be between -90 and 90' }),
+    lng: z.number().min(-180).max(180, { message: 'Longitude must be between -180 and 180' })
   })
 })
 
@@ -17,8 +17,8 @@ const rideSchema = z.object({
   origin: locationSchema,
   destination: locationSchema,
   meetingPoint: locationSchema,
-  availableSeats: z.number().min(1).max(MAXIMUM_SEATS),
-  price: z.number().min(1).max(MAXIMUM_RIDE_PRICE),
+  availableSeats: z.number().min(1).max(MAXIMUM_SEATS, { message: `Available seats must be between 1 and ${MAXIMUM_SEATS}` }),
+  price: z.number().min(1).max(MAXIMUM_RIDE_PRICE, { message: `Price must be between 1 and ${MAXIMUM_RIDE_PRICE}` }),
   departureDate: z.string().transform((departureDate) => new Date(departureDate))
 }).refine(
   (ride) =>
