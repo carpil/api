@@ -9,6 +9,7 @@ import { User } from '@models/user'
 import { UserInfo } from '@models/user-info'
 import { validateRide } from 'schemas/ride'
 import { FieldValue } from 'firebase-admin/firestore'
+import { validateUser } from 'schemas/user'
 
 dotenv.config()
 
@@ -245,6 +246,85 @@ app.get('/users/:id', authenticate, async (_req, res) => {
   }
   const user = userRef.data() as User
   res.json({ user })
+})
+
+// app.get('/users/me', authenticate, async (req, res) => {})
+
+app.post('/signup', authenticate, async (req: AuthRequest, res) => {
+  const userRequest = validateUser(req.body)
+  if (!userRequest.success) {
+    res.status(400).json({ message: userRequest.error.message })
+    return
+  }
+
+  const currentUserId = req.user?.uid
+  if (currentUserId == null ||userRequest.data.id !== currentUserId) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const currentUserEmail = req.user?.email
+  if (currentUserEmail == null || currentUserEmail !== userRequest.data.email) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const userRef = await firestore.collection('users').doc(currentUserId).get()
+  if (userRef.exists) {
+    res.status(400).json({ message: 'User already exists' })
+    return
+  }
+
+  const userToSave: User = {
+    ...userRequest.data,
+    id: currentUserId,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+
+
+  const result = await firestore.collection('users').doc(currentUserId).set(userToSave)
+  if (result.writeTime == null) {
+    res.status(500).json({ message: 'Failed to save user' })
+    return
+  }
+
+  res.json({ message: 'User created successfully', user: userToSave })
+})
+
+app.post('/login', authenticate, async (req: AuthRequest, res) => {
+  const userRequest = validateUser(req.body)
+  if (!userRequest.success) {
+    res.status(400).json({ message: userRequest.error.message })
+    return
+  }
+  
+  const currentUserId = req.user?.uid
+  if (currentUserId == null ||userRequest.data.id !== currentUserId) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const currentUserEmail = req.user?.email
+  if (currentUserEmail == null || currentUserEmail !== userRequest.data.email) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const userRef = await firestore.collection('users').doc(currentUserId).get()
+  if (!userRef.exists) {
+    res.status(404).json({ message: 'User not found' })
+    return
+  }
+
+  const user: User = {
+    ...userRef.data() as User,
+    id: currentUserId,
+    createdAt: userRef.data()?.createdAt?.toDate() ?? new Date(),
+    updatedAt: userRef.data()?.updatedAt?.toDate() ?? new Date()
+  }
+
+  res.json({ message: 'User logged in successfully', user })
 })
 
 app.listen(PORT, () => {
