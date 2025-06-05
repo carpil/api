@@ -327,6 +327,57 @@ app.post('/login', authenticate, async (req: AuthRequest, res) => {
   res.json({ message: 'User logged in successfully', user })
 })
 
+app.post('/login/social', authenticate, async (req: AuthRequest, res) => {
+    const userRequest = validateUser(req.body)
+  if (!userRequest.success) {
+    res.status(400).json({ message: userRequest.error.message })
+    return
+  }
+  
+  const currentUserId = req.user?.uid
+  if (currentUserId == null ||userRequest.data.id !== currentUserId) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const currentUserEmail = req.user?.email
+  if (currentUserEmail == null || currentUserEmail !== userRequest.data.email) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  // check if user exists
+  const userRef = await firestore.collection('users').doc(currentUserId).get()
+  if (!userRef.exists) {
+    // create user
+    const userToSave: User = {
+      ...userRequest.data,
+      id: currentUserId,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+
+    const result = await firestore.collection('users').doc(currentUserId).set(userToSave)
+    if (result.writeTime == null) {
+      res.status(500).json({ message: 'Failed to save user' })
+      return
+    }
+
+    res.json({ message: 'User created successfully', user: userToSave })
+    return
+  }
+
+  const user: User = {
+    ...userRef.data() as User,
+    id: currentUserId,
+    createdAt: userRef.data()?.createdAt?.toDate() ?? new Date(),
+    updatedAt: userRef.data()?.updatedAt?.toDate() ?? new Date()
+  }
+
+  res.json({ message: 'User logged in successfully', user })
+  return
+})
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
 })
