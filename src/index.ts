@@ -7,9 +7,14 @@ import { Ride } from '@models/ride'
 import { RideRequest } from '@models/ride-request'
 import { User } from '@models/user'
 import { UserInfo } from '@models/user-info'
+import { Chat, ChatResponse, Message } from '@models/chat'
 import { validateRide } from 'schemas/ride'
 import { FieldValue } from 'firebase-admin/firestore'
 import { validateUser } from 'schemas/user'
+import { validateMessage } from 'schemas/message'
+import { getRide } from '@utils/ride-utils'
+import { decryptMessage, encryptMessage } from '@utils/message-utils'
+import { Expo } from 'expo-server-sdk'
 
 dotenv.config()
 
@@ -25,6 +30,8 @@ const MAX_ACTIVE_RIDES = 2
 
 // In-memory rate limiting store (consider using Redis for production)
 const rateLimitStore = new Map<string, { count: number, timestamp: number }>()
+
+const expo = new Expo()
 
 app.get('/', async (_req, res) => {
   res.send('Welcome to Carpil')
@@ -175,6 +182,35 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
     return
   }
 
+  // Create chat for the ride
+  const chatRef = firestore.collection('chats').doc()
+  const chat: Chat = {
+    id: chatRef.id,
+    participants: [currentUserId],
+    owner: currentUserId,
+    rideId: rideRef.id,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+
+  try {
+    await chatRef.set(chat)
+    console.debug('Chat created for ride:', { rideId: rideRef.id, chatId: chatRef.id, driverId: currentUserId })
+  } catch (error) {
+    console.error('Failed to create chat for ride:', { rideId: rideRef.id, error })
+    // Don't fail the ride creation if chat creation fails
+  }
+
+  // Update ride with chat ID
+  try {
+    await firestore.collection('rides').doc(rideRef.id).update({
+      chatId: chatRef.id
+    })
+    ride.chatId = chatRef.id
+  } catch (error) {
+    console.error('Failed to update ride with chat ID:', { rideId: rideRef.id, chatId: chatRef.id, error })
+  }
+
   res.json({ ride })
 })
 
@@ -233,6 +269,21 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
     updatedAt: new Date()
   })
 
+  // Add passenger to the ride's chat
+  if (ride.chatId) {
+    try {
+      await firestore.collection('chats').doc(ride.chatId).update({
+        participants: FieldValue.arrayUnion(currentUserId),
+        updatedAt: new Date()
+      })
+      console.debug('Passenger added to chat:', { rideId, chatId: ride.chatId, passengerId: currentUserId })
+    } catch (error) {
+      console.error('Failed to add passenger to chat:', { rideId, chatId: ride.chatId, passengerId: currentUserId, error })
+      res.status(500).json({ message: 'Failed to add passenger to chat' })
+      return
+    }
+  }
+
   res.json({ message: 'Successfully joined the ride' })
 })
 
@@ -247,8 +298,6 @@ app.get('/users/:id', authenticate, async (_req, res) => {
   const user = userRef.data() as User
   res.json({ user })
 })
-
-// app.get('/users/me', authenticate, async (req, res) => {})
 
 app.post('/signup', authenticate, async (req: AuthRequest, res) => {
   const userRequest = validateUser(req.body)
@@ -377,6 +426,293 @@ app.post('/login/social', authenticate, async (req: AuthRequest, res) => {
   res.json({ message: 'User logged in successfully', user })
   return
 })
+
+app.get('/chats', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  try {
+    const chatsSnapshot = await firestore
+      .collection('chats')
+      .where('participants', 'array-contains', currentUserId)
+      .get()
+
+    if (chatsSnapshot.empty) {
+      console.log('No chats found for user:', currentUserId)
+      res.json([])
+      return
+    }
+
+    const chatsFirebase = chatsSnapshot.docs.map(doc => {
+      const chat = doc.data() as Chat
+      chat.id = doc.id
+      chat.createdAt = doc.data().createdAt.toDate()
+      chat.updatedAt = doc.data().updatedAt?.toDate()
+      return chat
+    })
+
+    console.log('Found chats for user:', currentUserId, 'chat IDs:', chatsFirebase.map(chat => chat.id))
+
+    const chats: ChatResponse[] = []
+    for (const chat of chatsFirebase) {
+      // Get chat participants info
+      const participants = chat.participants
+      const members: User[] = []
+      for (const participant of participants) {
+        const participantSnapshot = await firestore
+          .collection('users')
+          .doc(participant)
+          .get()
+
+        if (participantSnapshot.exists) {
+          members.push(participantSnapshot.data() as User)
+        } else {
+          console.warn('Participant not found:', { userId: currentUserId, chatId: chat.id, participant, participants: chat.participants })
+        }
+      }
+
+      // Get chat ride info
+      const ride = chat.rideId != null ? await getRide({ id: chat.rideId }) : null
+
+      // Get chat owner info
+      const owner = members.find(member => member.id === chat.owner)
+
+      // Decrypt last message content
+      const lastMessage: Message | null = chat.lastMessage != null
+        ? {
+          ...chat.lastMessage,
+          content: decryptMessage(chat.lastMessage.content)
+        }
+        : null
+
+      const chatResponse: ChatResponse = {
+        ...chat,
+        participants: members,
+        owner: owner as User,
+        lastMessage,
+        ride
+      }
+      chats.push(chatResponse)
+    }
+
+    res.json(chats)
+  } catch (error) {
+    console.error('Error fetching chats:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
+app.get('/chats/:id', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const chatId = req.params.id
+
+  try {
+    const chatSnapshot = await firestore
+      .collection('chats')
+      .doc(chatId)
+      .get()
+
+    if (!chatSnapshot.exists) {
+      res.status(404).json({ error: 'Chat not found' })
+      return
+    }
+
+    const chat = chatSnapshot.data() as Chat
+    chat.id = chatSnapshot.id
+    chat.createdAt = chatSnapshot.data()?.createdAt?.toDate()
+    chat.updatedAt = chatSnapshot.data()?.updatedAt?.toDate()
+
+    if (chat.deletedAt != null) {
+      res.status(404).json({ error: 'Chat deleted' })
+      return
+    }
+
+    if (!chat.participants.includes(currentUserId)) {
+      res.status(403).json({ error: 'You are not a participant of this chat' })
+      return
+    }
+
+    const members: User[] = []
+    for (const participant of chat.participants) {
+      const participantSnapshot = await firestore
+        .collection('users')
+        .doc(participant)
+        .get()
+
+      if (participantSnapshot.exists) {
+        members.push(participantSnapshot.data() as User)
+      }
+    }
+
+    // Check if lastMessage is from past participants
+    if (chat.lastMessage && chat.lastMessage.senderId && chat.pastParticipants?.includes(chat.lastMessage.senderId)) {
+      chat.lastMessage = undefined
+    }
+
+    // Update chat last message seenBy
+    if (chat.lastMessage && !chat.lastMessage.seenBy?.includes(currentUserId)) {
+      try {
+        await firestore.collection('chats').doc(chatId).update({
+          lastMessage: {
+            ...chat.lastMessage,
+            seenBy: FieldValue.arrayUnion(currentUserId)
+          }
+        })
+      } catch (error) {
+        console.error('Error updating chat last message seenBy:', error)
+        res.status(500).json({ message: 'Internal server error' })
+        return
+      }
+    }
+
+    // Decrypt last message content if it exists
+    const lastMessage: Message | null = chat.lastMessage != null
+      ? {
+        ...chat.lastMessage,
+        content: decryptMessage(chat.lastMessage.content)
+      }
+      : null
+
+    const chatResponse: ChatResponse = {
+      ...chat,
+      participants: members,
+      owner: members.find(member => member.id === chat.owner) as User,
+      lastMessage,
+      ride: chat.rideId != null ? await getRide({ id: chat.rideId }) : null
+    }
+
+    res.json(chatResponse)
+  } catch (error) {
+    console.error('Error fetching chat:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
+app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const chatId = req.params.id
+
+  try {
+    const chatSnapshot = await firestore.collection('chats').doc(chatId).get()
+
+    if (!chatSnapshot.exists) {
+      console.error('Chat not found:', { chatId, userId: currentUserId })
+      res.status(404).json({ error: 'Chat not found' })
+      return
+    }
+
+    const chat = chatSnapshot.data() as Chat
+    if (!chat.participants.includes(currentUserId)) {
+      console.error('User is not a participant of chat:', { chatId, userId: currentUserId, participants: chat.participants })
+      res.status(403).json({ error: 'You are not a participant of this chat' })
+      return
+    }
+
+    const userMessagesSnapshot = await firestore
+      .collection(`chats/${chatId}/messages`)
+      .where('userId', '==', currentUserId)
+      .get()
+
+    const oneMinuteAgo = new Date(Date.now() - 60000)
+    const recentMessages = userMessagesSnapshot.docs.filter(doc => doc.createTime.toDate() > oneMinuteAgo)
+    console.debug('Recent messages:', { userId: currentUserId, chatId, recentMessages: recentMessages.map(doc => doc.id) })
+
+    if (recentMessages.length >= 10) {
+      console.error('Too many messages in a short period of time:', { userId: currentUserId, chatId })
+      res.status(429).json({ message: 'Too many messages in a short period of time' })
+      return
+    }
+
+    const messageRequest = validateMessage(req.body)
+    if (!messageRequest.success) {
+      console.error('Message schema validation failed:', { userId: currentUserId, chatId, error: messageRequest.error })
+      res.status(400).json({ message: 'Invalid request' })
+      return
+    }
+
+    const newMessageRef = firestore.collection(`chats/${chatId}/messages`)
+    const newMessage: Message = {
+      id: newMessageRef.id,
+      content: encryptMessage(messageRequest.data.content),
+      createdAt: new Date(),
+      userId: currentUserId,
+      seenBy: []
+    }
+
+    try {
+      await newMessageRef.add(newMessage)
+      console.debug('Message added:', { userId: currentUserId, chatId, message: newMessage.id })
+    } catch (error) {
+      console.error('Cannot add message:', { userId: currentUserId, chatId, error })
+      res.status(500).json({ message: 'Internal server error' })
+      return
+    }
+
+    try {
+      await firestore.collection('chats').doc(chatId).update({ lastMessage: newMessage })
+      console.debug('Chat last message updated:', { userId: currentUserId, chatId, message: newMessage.id })
+    } catch (error) {
+      console.error('Cannot update chat last message:', { userId: currentUserId, chatId, error })
+      res.status(500).json({ message: 'Internal server error' })
+      return
+    }
+
+    const otherParticipants = chat.participants.filter(p => p !== currentUserId)
+    const pushMessages = []
+
+    for (const participantId of otherParticipants) {
+      try {
+        const userSnapshot = await firestore.collection('users').doc(participantId).get()
+        const userData = userSnapshot.data()
+
+        const pushToken = userData?.expoPushToken
+        if (pushToken && Expo.isExpoPushToken(pushToken)) {
+          pushMessages.push({
+            to: pushToken,
+            sound: 'default',
+            title: 'Nuevo mensaje',
+            body: messageRequest.data.content.slice(0, 80),
+            data: {
+              chatId,
+              senderId: currentUserId
+            }
+          })
+        }
+      } catch (error) {
+        console.error('Error getting participant data for push:', { participantId, error })
+      }
+    }
+
+    if (pushMessages.length > 0) {
+      try {
+        const receipts = await expo.sendPushNotificationsAsync(pushMessages)
+        console.debug('Push notifications sent:', receipts)
+      } catch (error) {
+        console.error('Failed to send push notifications:', error)
+      }
+    }
+
+    console.info('Message sent:', { userId: currentUserId, chatId })
+    res.json({ message: 'Message sent successfully' })
+  } catch (error) {
+    console.error('Error sending message:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
