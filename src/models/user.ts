@@ -7,6 +7,7 @@ export interface User {
   lastName?: string
   phoneNumber?: string
   profileCompleted?: boolean
+  pushToken?: string[]
   createdAt?: Date
   updatedAt?: Date
 }

@@ -10,7 +10,7 @@ import { UserInfo } from '@models/user-info'
 import { Chat, ChatResponse, Message } from '@models/chat'
 import { validateRide } from 'schemas/ride'
 import { FieldValue } from 'firebase-admin/firestore'
-import { validateUser } from 'schemas/user'
+import { validateUser, validatePushToken } from 'schemas/user'
 import { validateMessage } from 'schemas/message'
 import { getRide } from '@utils/ride-utils'
 import { decryptMessage, encryptMessage } from '@utils/message-utils'
@@ -427,6 +427,94 @@ app.post('/login/social', authenticate, async (req: AuthRequest, res) => {
   return
 })
 
+app.post('/notifications/token', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const pushTokenRequest = validatePushToken(req.body)
+  if (!pushTokenRequest.success) {
+    res.status(400).json({ message: pushTokenRequest.error.message })
+    return
+  }
+
+  const { pushToken } = pushTokenRequest.data
+
+  try {
+    // Check if user exists
+    const userRef = await firestore.collection('users').doc(currentUserId).get()
+    if (!userRef.exists) {
+      res.status(404).json({ message: 'User not found' })
+      return
+    }
+
+    const userData = userRef.data() as User
+    const currentPushTokens = userData.pushToken || []
+
+    // Add the new token if it doesn't already exist
+    if (!currentPushTokens.includes(pushToken)) {
+      await firestore.collection('users').doc(currentUserId).update({
+        pushToken: FieldValue.arrayUnion(pushToken),
+        updatedAt: new Date()
+      })
+    }
+
+    res.json({ 
+      message: 'Push token updated successfully',
+      pushToken
+    })
+  } catch (error) {
+    console.error('Error updating push token:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
+app.post('/notifications/token/remove', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const pushTokenRequest = validatePushToken(req.body)
+  if (!pushTokenRequest.success) {
+    res.status(400).json({ message: pushTokenRequest.error.message })
+    return
+  }
+
+  const { pushToken } = pushTokenRequest.data
+
+  try {
+    // Check if user exists
+    const userRef = await firestore.collection('users').doc(currentUserId).get()
+    if (!userRef.exists) {
+      res.status(404).json({ message: 'User not found' })
+      return
+    }
+
+    const userData = userRef.data() as User
+    const currentPushTokens = userData.pushToken || []
+
+    // Remove the token if it exists
+    if (currentPushTokens.includes(pushToken)) {
+      await firestore.collection('users').doc(currentUserId).update({
+        pushToken: FieldValue.arrayRemove(pushToken),
+        updatedAt: new Date()
+      })
+    }
+
+    res.json({ 
+      message: 'Push token removed successfully',
+      pushToken
+    })
+  } catch (error) {
+    console.error('Error removing push token:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
 app.get('/chats', authenticate, async (req: AuthRequest, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
@@ -678,18 +766,20 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
         const userSnapshot = await firestore.collection('users').doc(participantId).get()
         const userData = userSnapshot.data()
 
-        const pushToken = userData?.expoPushToken
-        if (pushToken && Expo.isExpoPushToken(pushToken)) {
-          pushMessages.push({
-            to: pushToken,
-            sound: 'default',
-            title: 'Nuevo mensaje',
-            body: messageRequest.data.content.slice(0, 80),
-            data: {
-              chatId,
-              senderId: currentUserId
-            }
-          })
+        const pushTokens = userData?.pushToken || []
+        for (const pushToken of pushTokens) {
+          if (Expo.isExpoPushToken(pushToken)) {
+            pushMessages.push({
+              to: pushToken,
+              sound: 'default',
+              title: 'Nuevo mensaje',
+              body: messageRequest.data.content.slice(0, 80),
+              data: {
+                chatId,
+                senderId: currentUserId
+              }
+            })
+          }
         }
       } catch (error) {
         console.error('Error getting participant data for push:', { participantId, error })
