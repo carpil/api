@@ -2,6 +2,7 @@ import { UserInfo } from '@models/user-info'
 
 export interface Ride {
   id: string
+  chatId: string
   origin: Location
   destination: Location
   meetingPoint: Location
@@ -10,9 +11,9 @@ export interface Ride {
   departureDate: Date
   passengers: UserInfo[]
   driver: UserInfo
-  deletedAt: Date | null
   status?: 'active' | 'canceled' | 'completed'
-  chatId: string
+  ratings?: string[]
+  deletedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }

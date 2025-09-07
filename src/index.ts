@@ -15,6 +15,8 @@ import { validateMessage } from 'schemas/message'
 import { getRide } from '@utils/ride-utils'
 import { decryptMessage, encryptMessage } from '@utils/message-utils'
 import { Expo } from 'expo-server-sdk'
+import { validateRating } from 'schemas/rating'
+import { Rating } from '@models/rating'
 
 dotenv.config()
 
@@ -803,6 +805,92 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
+app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const ratingRequest = validateRating(req.body)
+  if (!ratingRequest.success) {
+    res.status(400).json({ message: ratingRequest.error.message })
+    return
+  }
+
+  if (currentUserId === ratingRequest.data.userId) {
+    res.status(400).json({ message: 'You cannot rate yourself' })
+    return
+  }
+
+  const ratingRef = firestore.collection('ratings').doc()
+  const rating: Rating = {
+    id: ratingRef.id,
+    userId: currentUserId,
+    rideId: ratingRequest.data.rideId,
+    rating: ratingRequest.data.rating,
+    comment: ratingRequest.data.comment,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+
+  // create rating in firestore
+  try {
+    await ratingRef.set(rating)
+    console.debug('Rating added:', { userId: currentUserId, rideId: ratingRequest.data.rideId })
+  } catch (error) {
+    console.error('Cannot add rating:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
+    res.status(500).json({ message: 'Internal server error' })
+    return
+  }
+
+  // update ride rating
+  const rideRef = await firestore.collection('rides').doc(ratingRequest.data.rideId).get()
+  if (!rideRef.exists) {
+    res.status(404).json({ message: 'Ride not found' })
+    return
+  }
+  
+  const ride = rideRef.data() as Ride
+  if (ride.ratings == null) {
+    ride.ratings = []
+  }
+
+  ride.ratings.push(ratingRef.id)
+
+  try {
+    await rideRef.ref.set({ ratings: ride.ratings })
+    console.debug('Ride ratings updated:', { userId: currentUserId, rideId: ratingRequest.data.rideId })
+  } catch (error) {
+    console.error('Cannot update ride ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
+    res.status(500).json({ message: 'Internal server error' })
+    return
+  }
+
+  // update user average rating
+  const userRef = await firestore.collection('users').doc(ratingRequest.data.userId).get()
+  if (!userRef.exists) {
+    res.status(404).json({ message: 'User not found' })
+    return
+  }
+
+  const user = userRef.data() as User
+  user.averageRating = user.averageRating ?? 0
+  user.averageRating = (user.averageRating + rating.rating) / 2
+  
+  try {
+    await userRef.ref.set({ averageRating: user.averageRating })
+    console.debug('User average rating updated:', { userId: ratingRequest.data.userId })
+  } catch (error) {
+    console.error('Cannot update user average rating:', { userId: ratingRequest.data.userId, error })
+    res.status(500).json({ message: 'Internal server error' })
+    return
+  }
+
+  res.json({ message: 'Rating added successfully' })
+  
+  
+})
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)

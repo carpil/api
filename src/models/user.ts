@@ -8,6 +8,7 @@ export interface User {
   phoneNumber?: string
   profileCompleted?: boolean
   pushToken?: string[]
+  averageRating?: number
   createdAt?: Date
   updatedAt?: Date
 }
