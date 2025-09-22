@@ -9,6 +9,12 @@ export interface User {
   profileCompleted?: boolean
   pushToken?: string[]
   averageRating?: number
+  inRide?: {
+    active: boolean
+    rideId?: string
+    rideStartedAt?: Date
+    pendingToReview?: boolean
+  }
   createdAt?: Date
   updatedAt?: Date
 }

@@ -3,7 +3,7 @@ import dotenv from 'dotenv'
 
 import { authenticate, AuthRequest } from '@middlewares/auth.middleware'
 import { firestore } from 'config/firebase'
-import { Ride } from '@models/ride'
+import { Ride, RideStatus } from '@models/ride'
 import { RideRequest } from '@models/ride-request'
 import { User } from '@models/user'
 import { UserInfo } from '@models/user-info'
@@ -137,7 +137,7 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
   const activeRidesSnapshot = await firestore
     .collection('rides')
     .where('driver.id', '==', currentUserId)
-    .where('status', '==', 'active')
+    .where('status', '==', RideStatus.Active)
     .where('deletedAt', '==', null)
     .get()
 
@@ -165,7 +165,7 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
     ...rideRequest.data,
     driver: driverUserInfo,
     deletedAt: null,
-    status: 'active',
+    status: RideStatus.Active,
     chatId: '',
     passengers: [],
     createdAt: new Date(),
@@ -237,7 +237,7 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
     return
   }
 
-  if (ride.status !== 'active') {
+  if (ride.status !== RideStatus.Active) {
     res.status(400).json({ message: 'Ride is not active' })
     return
   }
@@ -287,6 +287,216 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
   }
 
   res.json({ message: 'Successfully joined the ride' })
+})
+
+app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
+  const rideId = req.params.id
+
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  try {
+    // Fetch ride
+    const rideDoc = await firestore.collection('rides').doc(rideId).get()
+    if (!rideDoc.exists) {
+      res.status(404).json({ message: 'Ride not found' })
+      return
+    }
+
+    const ride = rideDoc.data() as Ride
+
+    // Only driver can start the ride
+    if (ride.driver.id !== currentUserId) {
+      res.status(403).json({ message: 'Only the driver can start this ride' })
+      return
+    }
+
+    // Ensure ride is in a state that can be started
+    if (ride.status !== RideStatus.Active) {
+      res.status(400).json({ message: 'Ride cannot be started in its current status' })
+      return
+    }
+
+    // Update ride status to in_progress and updatedAt
+    await rideDoc.ref.update({
+      status: RideStatus.InProgress,
+      updatedAt: new Date()
+    })
+
+  // Flag driver as inRide
+    try {
+      await firestore.collection('users').doc(currentUserId).update({
+        inRide: {
+          active: true,
+          rideId,
+          rideStartedAt: new Date(),
+          pendingToReview: false
+        },
+        updatedAt: new Date()
+      })
+    } catch (error) {
+      console.error('Failed to set driver inRide flag:', { rideId, driverId: currentUserId, error })
+      // Not critical to block
+    }
+
+    // Notify passengers that the ride has started
+    const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+    const pushMessages: any[] = []
+
+    for (const passenger of passengers) {
+      try {
+        const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
+        const userData = userSnapshot.data() as User | undefined
+
+        const pushTokens = userData?.pushToken || []
+        for (const pushToken of pushTokens) {
+          if (Expo.isExpoPushToken(pushToken)) {
+            pushMessages.push({
+              to: pushToken,
+              sound: 'default',
+              title: 'Tu viaje ha iniciado',
+              body: 'El conductor ha iniciado el viaje.',
+              data: {
+                rideId,
+                driverId: currentUserId
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error preparing passenger push notification:', { passengerId: passenger.id, error })
+      }
+    }
+
+    if (pushMessages.length > 0) {
+      try {
+        const receipts = await expo.sendPushNotificationsAsync(pushMessages)
+        console.debug('Ride start push notifications sent:', receipts)
+      } catch (error) {
+        console.error('Failed to send ride start push notifications:', error)
+      }
+    }
+
+    res.json({ message: 'Ride started successfully' })
+  } catch (error) {
+    console.error('Error starting ride:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
+})
+
+app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
+  const rideId = req.params.id
+
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  try {
+    // Fetch ride
+    const rideDoc = await firestore.collection('rides').doc(rideId).get()
+    if (!rideDoc.exists) {
+      res.status(404).json({ message: 'Ride not found' })
+      return
+    }
+
+    const ride = rideDoc.data() as Ride
+
+    // Only driver can complete the ride
+    if (ride.driver.id !== currentUserId) {
+      res.status(403).json({ message: 'Only the driver can complete this ride' })
+      return
+    }
+
+    // Ensure ride is in a state that can be completed
+    if (ride.status !== RideStatus.InProgress && ride.status !== RideStatus.InRoute) {
+      res.status(400).json({ message: 'Ride cannot be completed in its current status' })
+      return
+    }
+
+    // Update ride status to completed and updatedAt
+    await rideDoc.ref.update({
+      status: RideStatus.Completed,
+      updatedAt: new Date()
+    })
+
+    // Flag driver to normal mode and mark pending review
+    try {
+      await firestore.collection('users').doc(currentUserId).update({
+        inRide: {
+          active: false,
+          rideId,
+          // Preserve rideStartedAt if exists; Firestore update cannot read existing here, so set to new Date for safety
+          rideStartedAt: new Date(),
+          pendingToReview: true
+        },
+        updatedAt: new Date()
+      })
+    } catch (error) {
+      console.error('Failed to unset driver inRide flag:', { rideId, driverId: currentUserId, error })
+      // Not critical to block
+    }
+
+    // Notify passengers and set their pendingToReview flags
+    const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+    const pushMessages: any[] = []
+
+    for (const passenger of passengers) {
+      try {
+        // Update passenger flags
+        await firestore.collection('users').doc(passenger.id).update({
+          inRide: {
+            active: false,
+            rideId,
+            rideStartedAt: new Date(),
+            pendingToReview: true
+          },
+          updatedAt: new Date()
+        })
+
+        // Prepare push
+        const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
+        const userData = userSnapshot.data() as User | undefined
+        const pushTokens = userData?.pushToken || []
+        for (const pushToken of pushTokens) {
+          if (Expo.isExpoPushToken(pushToken)) {
+            pushMessages.push({
+              to: pushToken,
+              sound: 'default',
+              title: 'Viaje completado',
+              body: 'El conductor ha completado el viaje.',
+              data: {
+                rideId,
+                driverId: currentUserId
+              }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error updating passenger flags or preparing push:', { passengerId: passenger.id, error })
+      }
+    }
+
+    if (pushMessages.length > 0) {
+      try {
+        const receipts = await expo.sendPushNotificationsAsync(pushMessages)
+        console.debug('Ride completion push notifications sent:', receipts)
+      } catch (error) {
+        console.error('Failed to send ride completion push notifications:', error)
+      }
+    }
+
+    // TODO: Send money to driver
+
+    res.json({ message: 'Ride completed successfully' })
+  } catch (error) {
+    console.error('Error completing ride:', error)
+    res.status(500).json({ message: 'Internal server error' })
+  }
 })
 
 app.get('/users/:id', authenticate, async (_req, res) => {
