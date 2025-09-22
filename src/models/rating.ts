@@ -1,6 +1,7 @@
 export interface Rating {
   id: string
-  userId: string
+  raterId: string
+  targetUserId: string
   rideId: string
   rating: number
   comment?: string

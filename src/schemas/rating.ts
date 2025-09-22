@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 const ratingSchema = z.object({
-  userId: z.string(),
+  targetUserId: z.string(),
   rideId: z.string(),
   rating: z.number().min(1).max(5),
   comment: z.string().max(200, { message: 'Comment must be less than 200 characters' }).optional()
