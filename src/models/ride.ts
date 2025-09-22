@@ -1,5 +1,13 @@
 import { UserInfo } from '@models/user-info'
 
+export enum RideStatus {
+  Active = 'active',
+  InProgress = 'in_progress',
+  InRoute = 'in_route',
+  Canceled = 'canceled',
+  Completed = 'completed'
+}
+
 export interface Ride {
   id: string
   chatId: string
@@ -11,7 +19,7 @@ export interface Ride {
   departureDate: Date
   passengers: UserInfo[]
   driver: UserInfo
-  status?: 'active' | 'canceled' | 'completed'
+  status?: RideStatus
   ratings?: string[]
   deletedAt: Date | null
   createdAt: Date
