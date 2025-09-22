@@ -342,12 +342,24 @@ app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
       // Not critical to block
     }
 
-    // Notify passengers that the ride has started
+    // Update passengers inRide and notify them that the ride has started
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const pushMessages: any[] = []
 
     for (const passenger of passengers) {
       try {
+        // Update passenger inRide state
+        await firestore.collection('users').doc(passenger.id).update({
+          inRide: {
+            active: true,
+            rideId,
+            rideStartedAt: new Date(),
+            pendingToReview: false
+          },
+          updatedAt: new Date()
+        })
+
+        // Prepare push notifications
         const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
         const userData = userSnapshot.data() as User | undefined
 
@@ -367,7 +379,7 @@ app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
           }
         }
       } catch (error) {
-        console.error('Error preparing passenger push notification:', { passengerId: passenger.id, error })
+        console.error('Error updating passenger inRide or preparing push:', { passengerId: passenger.id, error })
       }
     }
 
@@ -424,14 +436,19 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
       updatedAt: new Date()
     })
 
-    // Flag driver to normal mode and mark pending review
+    // Flag driver to normal mode and mark pending review (preserve rideStartedAt)
     try {
+      const driverSnap = await firestore.collection('users').doc(currentUserId).get()
+      const driverData = driverSnap.data() as User | undefined
+      const existingStartedAt = (driverData as any)?.inRide?.rideStartedAt
+        ? new Date((driverData as any).inRide.rideStartedAt)
+        : new Date()
+
       await firestore.collection('users').doc(currentUserId).update({
         inRide: {
           active: false,
           rideId,
-          // Preserve rideStartedAt if exists; Firestore update cannot read existing here, so set to new Date for safety
-          rideStartedAt: new Date(),
+          rideStartedAt: existingStartedAt,
           pendingToReview: true
         },
         updatedAt: new Date()
@@ -447,20 +464,25 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
 
     for (const passenger of passengers) {
       try {
+        // Read passenger to preserve original rideStartedAt and to get push tokens
+        const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
+        const userData = userSnapshot.data() as User | undefined
+        const existingStartedAt = (userData as any)?.inRide?.rideStartedAt
+          ? new Date((userData as any).inRide.rideStartedAt)
+          : new Date()
+
         // Update passenger flags
         await firestore.collection('users').doc(passenger.id).update({
           inRide: {
             active: false,
             rideId,
-            rideStartedAt: new Date(),
+            rideStartedAt: existingStartedAt,
             pendingToReview: true
           },
           updatedAt: new Date()
         })
 
         // Prepare push
-        const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
-        const userData = userSnapshot.data() as User | undefined
         const pushTokens = userData?.pushToken || []
         for (const pushToken of pushTokens) {
           if (Expo.isExpoPushToken(pushToken)) {
@@ -1028,15 +1050,27 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
     return
   }
 
-  if (currentUserId === ratingRequest.data.userId) {
+  if (currentUserId === ratingRequest.data.targetUserId) {
     res.status(400).json({ message: 'You cannot rate yourself' })
     return
   }
 
+  // Validate ride and compute required targets to rate
+  const rideDoc = await firestore.collection('rides').doc(ratingRequest.data.rideId).get()
+  if (!rideDoc.exists) {
+    res.status(404).json({ message: 'Ride not found' })
+    return
+  }
+  const rideData = rideDoc.data() as Ride
+  const allParticipants = [rideData.driver?.id, ...(rideData.passengers?.map(p => p.id) ?? [])].filter(Boolean) as string[]
+  const requiredTargets = new Set(allParticipants.filter(uid => uid !== currentUserId))
+
+  // Create rating entity
   const ratingRef = firestore.collection('ratings').doc()
   const rating: Rating = {
     id: ratingRef.id,
-    userId: currentUserId,
+    raterId: currentUserId,
+    targetUserId: ratingRequest.data.targetUserId,
     rideId: ratingRequest.data.rideId,
     rating: ratingRequest.data.rating,
     comment: ratingRequest.data.comment,
@@ -1056,20 +1090,12 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
 
   // update ride rating
   const rideRef = await firestore.collection('rides').doc(ratingRequest.data.rideId).get()
-  if (!rideRef.exists) {
-    res.status(404).json({ message: 'Ride not found' })
-    return
-  }
-  
   const ride = rideRef.data() as Ride
-  if (ride.ratings == null) {
-    ride.ratings = []
-  }
-
-  ride.ratings.push(ratingRef.id)
+  const rideRatings = Array.isArray(ride?.ratings) ? [...ride.ratings] : []
+  rideRatings.push(ratingRef.id)
 
   try {
-    await rideRef.ref.set({ ratings: ride.ratings })
+    await rideRef.ref.set({ ratings: rideRatings }, { merge: true })
     console.debug('Ride ratings updated:', { userId: currentUserId, rideId: ratingRequest.data.rideId })
   } catch (error) {
     console.error('Cannot update ride ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
@@ -1078,7 +1104,7 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
   }
 
   // update user average rating
-  const userRef = await firestore.collection('users').doc(ratingRequest.data.userId).get()
+  const userRef = await firestore.collection('users').doc(ratingRequest.data.targetUserId).get()
   if (!userRef.exists) {
     res.status(404).json({ message: 'User not found' })
     return
@@ -1090,16 +1116,116 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
   
   try {
     await userRef.ref.set({ averageRating: user.averageRating })
-    console.debug('User average rating updated:', { userId: ratingRequest.data.userId })
+    console.debug('User average rating updated:', { userId: ratingRequest.data.targetUserId })
   } catch (error) {
-    console.error('Cannot update user average rating:', { userId: ratingRequest.data.userId, error })
+    console.error('Cannot update user average rating:', { userId: ratingRequest.data.targetUserId, error })
     res.status(500).json({ message: 'Internal server error' })
     return
+  }
+
+  // After creating this rating, check if current user has rated all required targets for this ride
+  try {
+    const myRatingsSnapshot = await firestore
+      .collection('ratings')
+      .where('rideId', '==', ratingRequest.data.rideId)
+      .where('raterId', '==', currentUserId)
+      .get()
+
+    const ratedTargets = new Set<string>()
+    myRatingsSnapshot.docs.forEach(doc => {
+      const r = doc.data() as Rating
+      if (r.targetUserId) ratedTargets.add(r.targetUserId)
+    })
+
+    let hasCompletedAll = true
+    for (const uid of requiredTargets) {
+      if (!ratedTargets.has(uid)) { hasCompletedAll = false; break }
+    }
+
+    if (hasCompletedAll) {
+      try {
+        const meSnap = await firestore.collection('users').doc(currentUserId).get()
+        const meData = meSnap.data() as User | undefined
+        const existingStartedAt = (meData as any)?.inRide?.rideStartedAt
+          ? new Date((meData as any).inRide.rideStartedAt)
+          : undefined
+
+        await firestore.collection('users').doc(currentUserId).update({
+          inRide: {
+            active: (meData as any)?.inRide?.active ?? false,
+            rideId: ratingRequest.data.rideId,
+            rideStartedAt: existingStartedAt,
+            pendingToReview: false
+          },
+          updatedAt: new Date()
+        })
+      } catch (error) {
+        console.error('Failed to unset pendingToReview after completing ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
+      }
+    }
+  } catch (error) {
+    console.error('Error validating completed ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
   }
 
   res.json({ message: 'Rating added successfully' })
   
   
+})
+
+app.get('/rides/:id/ratings/pending', authenticate, async (req: AuthRequest, res) => {
+  const currentUserId = req.user?.uid
+  if (currentUserId == null) {
+    res.status(401).json({ message: 'Unauthorized' })
+    return
+  }
+
+  const rideId = req.params.id
+
+  try {
+    const rideDoc = await firestore.collection('rides').doc(rideId).get()
+    if (!rideDoc.exists) {
+      res.status(404).json({ message: 'Ride not found' })
+      return
+    }
+
+    const rideData = rideDoc.data() as Ride
+    const allParticipants = [rideData.driver?.id, ...(rideData.passengers?.map(p => p.id) ?? [])].filter(Boolean) as string[]
+
+    // Remove self from required targets
+    const requiredTargets = new Set(allParticipants.filter(uid => uid !== currentUserId))
+
+    // Fetch my ratings for this ride
+    const myRatingsSnapshot = await firestore
+      .collection('ratings')
+      .where('rideId', '==', rideId)
+      .where('raterId', '==', currentUserId)
+      .get()
+
+    const ratedTargets = new Set<string>()
+    myRatingsSnapshot.docs.forEach(doc => {
+      const r = doc.data() as Rating
+      if (r.targetUserId) ratedTargets.add(r.targetUserId)
+    })
+
+    const pending = Array.from(requiredTargets).filter(uid => !ratedTargets.has(uid))
+
+    // Include user details and whether they are the driver
+    const pendingUsers = [] as Array<{ user: User, isDriver: boolean }>
+    for (const uid of pending) {
+      const userSnap = await firestore.collection('users').doc(uid).get()
+      if (userSnap.exists) {
+        pendingUsers.push({
+          user: userSnap.data() as User,
+          isDriver: rideData.driver?.id === uid
+        })
+      }
+    }
+
+    res.json({ rideId, pendingUserIds: pending, pendingUsers })
+  } catch (error) {
+    console.error('Error fetching pending ratings:', { rideId, userId: currentUserId, error })
+    res.status(500).json({ message: 'Internal server error' })
+  }
 })
 
 app.listen(PORT, () => {
