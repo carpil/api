@@ -1,0 +1,73 @@
+import { firestore } from 'config/firebase'
+import { FieldValue } from 'firebase-admin/firestore'
+import { Ride, RideStatus, UserInfo } from '@models/ride.model'
+import { IRidesRepository } from '@interfaces/repositories.interface'
+
+export class RidesRepository implements IRidesRepository {
+  async getById(rideId: string): Promise<Ride | null> {
+    const rideDocument = await firestore.collection('rides').doc(rideId).get()
+    if (!rideDocument.exists) return null
+    
+    const rideData = rideDocument.data() as any
+    return {
+      ...rideData,
+      id: rideDocument.id,
+      departureDate: rideData?.departureDate?.toDate() ?? null,
+      deletedAt: rideData?.deletedAt?.toDate() ?? null,
+      createdAt: rideData?.createdAt?.toDate() ?? null,
+      updatedAt: rideData?.updatedAt?.toDate() ?? null,
+      startedAt: rideData?.startedAt?.toDate()
+    } as Ride
+  }
+
+  async listAllDrivers(): Promise<Ride[]> {
+    const ridesSnapshot = await firestore.collection('rides').get()
+    return ridesSnapshot.docs.map(rideDocument => {
+      const rideData = rideDocument.data() as any
+      return {
+        ...(rideData as Ride),
+        id: rideDocument.id,
+        departureDate: rideData?.departureDate?.toDate() ?? null,
+        deletedAt: rideData?.deletedAt?.toDate() ?? null,
+        createdAt: rideData?.createdAt?.toDate() ?? null,
+        updatedAt: rideData?.updatedAt?.toDate() ?? null
+      }
+    })
+  }
+
+  async countActiveByDriver(driverId: string): Promise<number> {
+    const activeRidesQuery = await firestore
+      .collection('rides')
+      .where('driver.id', '==', driverId)
+      .where('status', '==', RideStatus.Active)
+      .where('deletedAt', '==', null)
+      .get()
+    return activeRidesQuery.size
+  }
+
+  async create(newRide: Omit<Ride, 'id'>): Promise<Ride> {
+    const rideDocumentRef = firestore.collection('rides').doc()
+    const rideWithId = { ...newRide, id: rideDocumentRef.id }
+    await rideDocumentRef.set(rideWithId)
+    return rideWithId as Ride
+  }
+
+  async update(rideId: string, rideUpdates: Partial<Ride>): Promise<void> {
+    await firestore.collection('rides').doc(rideId).update(rideUpdates)
+  }
+
+  async addPassenger(rideId: string, passengerInfo: UserInfo): Promise<void> {
+    await firestore.collection('rides').doc(rideId).update({
+      passengers: FieldValue.arrayUnion(passengerInfo),
+      updatedAt: new Date()
+    })
+  }
+
+  async setParticipant(rideId: string, userId: string, participantStatus: { active: boolean, pendingToReview: boolean }): Promise<void> {
+    await firestore.collection('rides').doc(rideId)
+      .collection('participants').doc(userId)
+      .set(participantStatus, { merge: true })
+  }
+}
+
+
