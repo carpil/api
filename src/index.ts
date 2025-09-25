@@ -161,7 +161,8 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
   const driverUserInfo: UserInfo = {
     id: driverUser.id,
     name: driverUser.name,
-    profilePicture: driverUser.profilePicture
+    profilePicture: driverUser.profilePicture,
+    role: 'driver'
   }
 
   let ride: Ride = {
@@ -265,7 +266,8 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
   const passengerUserInfo: UserInfo = {
     id: passengerUser.id,
     name: passengerUser.name,
-    profilePicture: passengerUser.profilePicture
+    profilePicture: passengerUser.profilePicture,
+    role: 'passenger'
   }
 
   // Update ride's passenger list
