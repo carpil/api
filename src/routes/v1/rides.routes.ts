@@ -11,7 +11,7 @@ import { CreateRideSchema } from '../../models/ride.model'
 const router = Router()
 
 const ridesController = new RidesController(
-  new RidesService(new RidesRepository(), new UsersRepository(), new ChatsRepository())
+  new RidesService(new RidesRepository(new UsersRepository()), new UsersRepository(), new ChatsRepository())
 )
 
 router.get('/drivers', ridesController.listDrivers)

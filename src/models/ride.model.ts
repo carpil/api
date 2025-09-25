@@ -30,7 +30,8 @@ export const RideSchema = z.object({
   updatedAt: z.date(),
   status: z.nativeEnum(RideStatus),
   ratings: z.array(z.string()).optional(),
-  startedAt: z.date().optional()
+  startedAt: z.date().optional(),
+  completedAt: z.date().optional()
 })
 export type Ride = z.infer<typeof RideSchema>
 

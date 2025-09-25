@@ -1,9 +1,14 @@
 import { UsersRepository } from '../repositories/firebase/users.repository'
 import { HttpError } from '../utils/http'
 import { User } from '@models/user'
+import { RatingsService } from './ratings.service'
+import { UserInfo } from '@models/user-info'
 
 export class UsersService {
-  constructor(private readonly usersRepo: UsersRepository) {}
+  constructor(
+    private readonly usersRepo: UsersRepository,
+    private readonly ratingsService: RatingsService
+  ) {}
 
   async signup(currentUser: { uid: string, email?: string }, input: User) {
     if (!currentUser?.uid || input.id !== currentUser.uid) throw new HttpError(401, 'Unauthorized')
@@ -64,6 +69,37 @@ export class UsersService {
     const u = await this.usersRepo.getById(id)
     if (!u) throw new HttpError(404, 'User not found')
     return u
+  }
+
+  async bootstrap(userId: string) {
+    if (!userId) throw new HttpError(401, 'Unauthorized')
+
+    const user = await this.usersRepo.getById(userId)
+    if (!user) throw new HttpError(404, 'User not found')
+
+    const inRide = !!user.currentRideId
+    const pendingRatings = await this.ratingsService.listAllPendingForUser(userId)
+    
+    if (pendingRatings.pending.length === 0) {
+      return { rideId: null, inRide, pendingReviews: null, isDriver: false }
+    }
+
+    const mostRecentRide = pendingRatings.pending[0]
+    const pendingReviews: UserInfo[] = mostRecentRide.pendingUsers.map((item: any) => ({
+      id: item.user.id,
+      name: item.user.name,
+      profilePicture: item.user.profilePicture,
+      role: item.isDriver ? 'driver' : 'passenger'
+    }))
+
+    const isDriver = mostRecentRide.ride?.driver?.id === userId
+
+    return { 
+      rideId: mostRecentRide.rideId, 
+      inRide, 
+      pendingReviews: pendingReviews.length > 0 ? pendingReviews : null,
+      isDriver
+    }
   }
 }
 

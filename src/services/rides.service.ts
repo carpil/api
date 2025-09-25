@@ -96,6 +96,7 @@ export class RidesService {
 
     await this.ridesRepo.update(rideId, { status: RideStatus.InProgress, startedAt: new Date(), updatedAt: new Date() })
     await this.usersRepo.update(driverId, { currentRideId: rideId })
+    await this.ridesRepo.setParticipant(rideId, driverId, { active: true, pendingToReview: false })
 
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const pushNotifications: any[] = []
@@ -131,8 +132,16 @@ export class RidesService {
       throw new HttpError(400, 'Ride cannot be completed in its current status')
     }
 
-    await this.ridesRepo.update(rideId, { status: RideStatus.Completed, updatedAt: new Date() })
+    const participantsIds = [ride.driver?.id, ...(Array.isArray(ride.passengers) ? ride.passengers.map(p => p.id) : [])].filter(Boolean) as string[]
+    const driverPendingTargets = participantsIds.filter(id => id !== driverId).length > 0
+
+    await this.ridesRepo.update(rideId, { status: RideStatus.Completed, completedAt: new Date(), updatedAt: new Date() })
     await this.usersRepo.update(driverId, { currentRideId: null })
+    await this.ridesRepo.setParticipant(rideId, driverId, { active: false, pendingToReview: driverPendingTargets })
+
+    if (driverPendingTargets) {
+      await this.addPendingReviewRide(driverId, rideId)
+    }
 
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const pushNotifications: any[] = []
@@ -140,7 +149,12 @@ export class RidesService {
     for (const passenger of passengers) {
       const passengerUser = await this.usersRepo.getById(passenger.id)
       await this.usersRepo.update(passenger.id, { currentRideId: null })
-      await this.ridesRepo.setParticipant(rideId, passenger.id, { active: false, pendingToReview: true })
+      const passengerPendingTargets = participantsIds.filter(id => id !== passenger.id).length > 0
+      await this.ridesRepo.setParticipant(rideId, passenger.id, { active: false, pendingToReview: passengerPendingTargets })
+
+      if (passengerPendingTargets) {
+        await this.addPendingReviewRide(passenger.id, rideId)
+      }
 
       const pushTokens = passengerUser?.pushToken || []
       for (const pushToken of pushTokens) {
@@ -159,6 +173,16 @@ export class RidesService {
     if (pushNotifications.length > 0) {
       await expo.sendPushNotificationsAsync(pushNotifications)
     }
+  }
+
+  private async addPendingReviewRide(userId: string, rideId: string) {
+    const user = await this.usersRepo.getById(userId)
+    if (!user) return
+
+    const currentPending = user.pendingReviewRideIds || []
+    const updatedPending = [rideId, ...currentPending.filter(id => id !== rideId)]
+    
+    await this.usersRepo.update(userId, { pendingReviewRideIds: updatedPending })
   }
 }
 

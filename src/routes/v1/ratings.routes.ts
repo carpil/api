@@ -11,7 +11,7 @@ import { CreateRatingSchema } from '../../models/rating.model'
 const router = Router()
 
 const ratingsController = new RatingsController(
-  new RatingsService(new RatingsRepository(), new RidesRepository(), new UsersRepository())
+  new RatingsService(new RatingsRepository(), new RidesRepository(new UsersRepository()), new UsersRepository())
 )
 
 router.post('/', authenticate, validateBody(CreateRatingSchema), ratingsController.create)
