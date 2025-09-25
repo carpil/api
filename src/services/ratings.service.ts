@@ -54,6 +54,7 @@ export class RatingsService {
     const hasCompletedAll = Array.from(requiredTargets).every(uid => ratedTargets.has(uid))
     if (hasCompletedAll) {
       await this.ridesRepo.setParticipant(input.rideId, currentUserId, { active: false, pendingToReview: false })
+      await this.removePendingReviewRide(currentUserId, input.rideId)
     }
 
     return rating
@@ -75,6 +76,38 @@ export class RatingsService {
       if (u) users.push({ user: u, isDriver: ride.driver?.id === uid })
     }
     return { rideId, pendingUserIds: pendingIds, pendingUsers: users }
+  }
+
+  async listAllPendingForUser(currentUserId: string) {
+    if (!currentUserId) throw new HttpError(401, 'Unauthorized')
+
+    const rideIds = await this.ridesRepo.listPendingToReviewRidesForUser(currentUserId)
+    if (rideIds.length === 0) return { pending: [] }
+
+    const mostRecentRideId = rideIds[0]
+    const pendingRide = await this.listPending(mostRecentRideId, currentUserId)
+    
+    if (pendingRide.pendingUserIds.length === 0) return { pending: [] }
+
+    const ride = await this.ridesRepo.getById(mostRecentRideId)
+    return { 
+      pending: [{ 
+        rideId: mostRecentRideId, 
+        pendingUserIds: pendingRide.pendingUserIds, 
+        pendingUsers: pendingRide.pendingUsers, 
+        ride 
+      }] 
+    }
+  }
+
+  private async removePendingReviewRide(userId: string, rideId: string) {
+    const user = await this.usersRepo.getById(userId)
+    if (!user) return
+
+    const currentPending = user.pendingReviewRideIds || []
+    const updatedPending = currentPending.filter(id => id !== rideId)
+    
+    await this.usersRepo.update(userId, { pendingReviewRideIds: updatedPending })
   }
 }
 

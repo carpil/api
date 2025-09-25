@@ -29,6 +29,11 @@ export class UsersController {
     const user = await this.usersService.loginSocial(req.user!, body as any)
     res.json({ message: 'User logged in successfully', user })
   })
+
+  bootstrap = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const result = await this.usersService.bootstrap(req.user?.uid ?? '')
+    res.json(result)
+  })
 }
 
 

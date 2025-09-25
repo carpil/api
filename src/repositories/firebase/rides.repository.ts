@@ -2,8 +2,10 @@ import { firestore } from 'config/firebase'
 import { FieldValue } from 'firebase-admin/firestore'
 import { Ride, RideStatus, UserInfo } from '@models/ride.model'
 import { IRidesRepository } from '@interfaces/repositories.interface'
+import { UsersRepository } from './users.repository'
 
 export class RidesRepository implements IRidesRepository {
+  constructor(private readonly usersRepo: UsersRepository) {}
   async getById(rideId: string): Promise<Ride | null> {
     const rideDocument = await firestore.collection('rides').doc(rideId).get()
     if (!rideDocument.exists) return null
@@ -67,6 +69,22 @@ export class RidesRepository implements IRidesRepository {
     await firestore.collection('rides').doc(rideId)
       .collection('participants').doc(userId)
       .set(participantStatus, { merge: true })
+  }
+
+  async listPendingToReviewRidesForUser(userId: string): Promise<string[]> {
+    const user = await this.usersRepo.getById(userId)
+    return user?.pendingReviewRideIds || []
+  }
+
+  async getRatingsForRide(rideId: string, raterId: string): Promise<any[]> {
+    const ratingsSnapshot = await firestore
+      .collection('rides')
+      .doc(rideId)
+      .collection('ratings')
+      .where('raterId', '==', raterId)
+      .get()
+
+    return ratingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
   }
 }
 

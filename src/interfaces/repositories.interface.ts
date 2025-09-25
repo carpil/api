@@ -28,6 +28,7 @@ export interface IRidesRepository {
   update(id: string, partial: Partial<Ride>): Promise<void>
   addPassenger(rideId: string, passenger: any): Promise<void>
   setParticipant(rideId: string, userId: string, payload: { active: boolean, pendingToReview: boolean }): Promise<void>
+  listPendingToReviewRidesForUser(userId: string): Promise<string[]>
 }
 
 // Chat repository interface
