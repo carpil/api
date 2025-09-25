@@ -1,12 +1,14 @@
 import { cert } from 'firebase-admin/app'
 import admin from 'firebase-admin'
 
-const firebaseConfig = process.env.FIREBASE_CONFIG ?? ''
-
 if (admin.apps.length === 0) {
-  admin.initializeApp({
-    credential: cert(JSON.parse(firebaseConfig))
-  })
+  if (process.env.FIREBASE_CONFIG) {
+    admin.initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_CONFIG))
+    })
+  } else {
+    admin.initializeApp()
+  }
 }
 
 export const auth = admin.auth()

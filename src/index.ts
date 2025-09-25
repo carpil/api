@@ -1,5 +1,8 @@
 import express from 'express'
 import dotenv from 'dotenv'
+dotenv.config()
+
+dotenv.config({ path: '.env.local' })
 
 import { authenticate, AuthRequest } from '@middlewares/auth.middleware'
 import { firestore } from 'config/firebase'
@@ -18,7 +21,7 @@ import { Expo } from 'expo-server-sdk'
 import { validateRating } from 'schemas/rating'
 import { Rating } from '@models/rating'
 
-dotenv.config()
+
 
 const app = express()
 app.use(express.json())
@@ -320,44 +323,39 @@ app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
       return
     }
 
-    // Update ride status to in_progress and updatedAt
+    // Update ride status to in_progress, set startedAt, and updatedAt
     await rideDoc.ref.update({
       status: RideStatus.InProgress,
+      startedAt: new Date(),
       updatedAt: new Date()
     })
 
-  // Flag driver as inRide
+    // Set driver currentRideId (participants will contain only passengers)
     try {
       await firestore.collection('users').doc(currentUserId).update({
-        inRide: {
-          active: true,
-          rideId,
-          rideStartedAt: new Date(),
-          pendingToReview: false
-        },
-        updatedAt: new Date()
+        currentRideId: rideId
       })
     } catch (error) {
-      console.error('Failed to set driver inRide flag:', { rideId, driverId: currentUserId, error })
+      console.error('Failed to update driver currentRide:', { rideId, driverId: currentUserId, error })
       // Not critical to block
     }
 
-    // Update passengers inRide and notify them that the ride has started
+    // Update passengers currentRide and notify them that the ride has started
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const pushMessages: any[] = []
 
     for (const passenger of passengers) {
       try {
-        // Update passenger inRide state
+        // Update passenger currentRide and participant record
         await firestore.collection('users').doc(passenger.id).update({
-          inRide: {
-            active: true,
-            rideId,
-            rideStartedAt: new Date(),
-            pendingToReview: false
-          },
-          updatedAt: new Date()
+          currentRideId: rideId
         })
+        await firestore.collection('rides').doc(rideId)
+          .collection('participants').doc(passenger.id)
+          .set({
+            active: true,
+            pendingToReview: false
+          }, { merge: true })
 
         // Prepare push notifications
         const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
@@ -436,25 +434,12 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
       updatedAt: new Date()
     })
 
-    // Flag driver to normal mode and mark pending review (preserve rideStartedAt)
     try {
-      const driverSnap = await firestore.collection('users').doc(currentUserId).get()
-      const driverData = driverSnap.data() as User | undefined
-      const existingStartedAt = (driverData as any)?.inRide?.rideStartedAt
-        ? new Date((driverData as any).inRide.rideStartedAt)
-        : new Date()
-
       await firestore.collection('users').doc(currentUserId).update({
-        inRide: {
-          active: false,
-          rideId,
-          rideStartedAt: existingStartedAt,
-          pendingToReview: true
-        },
-        updatedAt: new Date()
+        currentRideId: null
       })
     } catch (error) {
-      console.error('Failed to unset driver inRide flag:', { rideId, driverId: currentUserId, error })
+      console.error('Failed to update driver completion state:', { rideId, driverId: currentUserId, error })
       // Not critical to block
     }
 
@@ -467,20 +452,18 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
         // Read passenger to preserve original rideStartedAt and to get push tokens
         const userSnapshot = await firestore.collection('users').doc(passenger.id).get()
         const userData = userSnapshot.data() as User | undefined
-        const existingStartedAt = (userData as any)?.inRide?.rideStartedAt
-          ? new Date((userData as any).inRide.rideStartedAt)
-          : new Date()
 
-        // Update passenger flags
+        // Update passenger completion flags
         await firestore.collection('users').doc(passenger.id).update({
-          inRide: {
-            active: false,
-            rideId,
-            rideStartedAt: existingStartedAt,
-            pendingToReview: true
-          },
-          updatedAt: new Date()
+          currentRideId: null
         })
+        
+        await firestore.collection('rides').doc(rideId)
+          .collection('participants').doc(passenger.id)
+          .set({
+            active: false,
+            pendingToReview: true
+          }, { merge: true })
 
         // Prepare push
         const pushTokens = userData?.pushToken || []
@@ -1144,21 +1127,11 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
 
     if (hasCompletedAll) {
       try {
-        const meSnap = await firestore.collection('users').doc(currentUserId).get()
-        const meData = meSnap.data() as User | undefined
-        const existingStartedAt = (meData as any)?.inRide?.rideStartedAt
-          ? new Date((meData as any).inRide.rideStartedAt)
-          : undefined
-
-        await firestore.collection('users').doc(currentUserId).update({
-          inRide: {
-            active: (meData as any)?.inRide?.active ?? false,
-            rideId: ratingRequest.data.rideId,
-            rideStartedAt: existingStartedAt,
+        await firestore.collection('rides').doc(ratingRequest.data.rideId)
+          .collection('participants').doc(currentUserId)
+          .set({
             pendingToReview: false
-          },
-          updatedAt: new Date()
-        })
+          }, { merge: true })
       } catch (error) {
         console.error('Failed to unset pendingToReview after completing ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
       }
