@@ -33,3 +33,4 @@ Thumbs.db
 
 # Firebase config
 /src/config/carpil-firebase-config.json
+firebase-service-account.json
