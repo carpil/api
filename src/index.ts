@@ -4,7 +4,7 @@ dotenv.config()
 
 dotenv.config({ path: '.env.local' })
 
-import { authenticate, AuthRequest } from '@middlewares/auth.middleware'
+import { authenticate } from '@middlewares/auth.middleware'
 import { firestore } from 'config/firebase'
 import { Ride, RideStatus } from '@models/ride'
 import { RideRequest } from '@models/ride-request'
@@ -99,7 +99,7 @@ app.get('/rides/passengers', async (_req, res) => {
   res.json({ rides })
 })
 
-app.post('/rides', authenticate, async (req: AuthRequest, res) => {
+app.post('/rides', authenticate, async (req, res) => {
   const rideRequest = validateRide(req.body)
   if (!rideRequest.success) {
     res.status(400).json({ message: rideRequest.error.message })
@@ -219,7 +219,7 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
   res.json({ ride })
 })
 
-app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
+app.post('/rides/:id/join', authenticate, async (req, res) => {
   const rideId = req.params.id
 
   const currentUserId = req.user?.uid
@@ -292,7 +292,7 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
   res.json({ message: 'Successfully joined the ride' })
 })
 
-app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
+app.post('/rides/:id/start', authenticate, async (req, res) => {
   const rideId = req.params.id
 
   const currentUserId = req.user?.uid
@@ -397,7 +397,7 @@ app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
-app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
+app.post('/rides/:id/complete', authenticate, async (req, res) => {
   const rideId = req.params.id
 
   const currentUserId = req.user?.uid
@@ -516,7 +516,7 @@ app.get('/users/:id', authenticate, async (_req, res) => {
   res.json({ user })
 })
 
-app.post('/signup', authenticate, async (req: AuthRequest, res) => {
+app.post('/signup', authenticate, async (req, res) => {
   const userRequest = validateUser(req.body)
   if (!userRequest.success) {
     res.status(400).json({ message: userRequest.error.message })
@@ -558,7 +558,7 @@ app.post('/signup', authenticate, async (req: AuthRequest, res) => {
   res.json({ message: 'User created successfully', user: userToSave })
 })
 
-app.post('/login', authenticate, async (req: AuthRequest, res) => {
+app.post('/login', authenticate, async (req, res) => {
   const userRequest = validateUser(req.body)
   if (!userRequest.success) {
     res.status(400).json({ message: userRequest.error.message })
@@ -593,7 +593,7 @@ app.post('/login', authenticate, async (req: AuthRequest, res) => {
   res.json({ message: 'User logged in successfully', user })
 })
 
-app.post('/login/social', authenticate, async (req: AuthRequest, res) => {
+app.post('/login/social', authenticate, async (req, res) => {
     const userRequest = validateUser(req.body)
   if (!userRequest.success) {
     res.status(400).json({ message: userRequest.error.message })
@@ -644,7 +644,7 @@ app.post('/login/social', authenticate, async (req: AuthRequest, res) => {
   return
 })
 
-app.post('/notifications/token', authenticate, async (req: AuthRequest, res) => {
+app.post('/notifications/token', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
@@ -688,7 +688,7 @@ app.post('/notifications/token', authenticate, async (req: AuthRequest, res) => 
   }
 })
 
-app.post('/notifications/token/remove', authenticate, async (req: AuthRequest, res) => {
+app.post('/notifications/token/remove', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
@@ -732,7 +732,7 @@ app.post('/notifications/token/remove', authenticate, async (req: AuthRequest, r
   }
 })
 
-app.get('/chats', authenticate, async (req: AuthRequest, res) => {
+app.get('/chats', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
@@ -810,7 +810,7 @@ app.get('/chats', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
-app.get('/chats/:id', authenticate, async (req: AuthRequest, res) => {
+app.get('/chats/:id', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
@@ -901,7 +901,7 @@ app.get('/chats/:id', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
-app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
+app.post('/chats/:id/messages', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
@@ -1020,7 +1020,7 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
   }
 })
 
-app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
+app.post('/ratings', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
@@ -1145,7 +1145,7 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
   
 })
 
-app.get('/rides/:id/ratings/pending', authenticate, async (req: AuthRequest, res) => {
+app.get('/rides/:id/ratings/pending', authenticate, async (req, res) => {
   const currentUserId = req.user?.uid
   if (currentUserId == null) {
     res.status(401).json({ message: 'Unauthorized' })
