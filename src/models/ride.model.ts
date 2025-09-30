@@ -7,6 +7,19 @@ export enum RideStatus {
   Completed = 'completed'
 }
 
+export const LocationSchema = z.object({
+  id: z.string(),
+  name: z.object({
+    primary: z.string(),
+    secondary: z.string()
+  }),
+  location: z.object({
+    lat: z.number().optional(),
+    lng: z.number().optional()
+  })
+})
+export type Location = z.infer<typeof LocationSchema>
+
 export const UserInfoSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -16,9 +29,9 @@ export type UserInfo = z.infer<typeof UserInfoSchema>
 
 export const RideSchema = z.object({
   id: z.string(),
-  origin: z.string(),
-  destination: z.string(),
-  meetingPoint: z.string().nullable().optional(),
+  origin: LocationSchema,
+  destination: LocationSchema,
+  meetingPoint: LocationSchema.nullable().optional(),
   availableSeats: z.number().int().min(0),
   price: z.number().min(0),
   passengers: z.array(UserInfoSchema).default([]),
@@ -36,9 +49,9 @@ export const RideSchema = z.object({
 export type Ride = z.infer<typeof RideSchema>
 
 export const CreateRideSchema = z.object({
-  origin: z.string(),
-  destination: z.string(),
-  meetingPoint: z.string().nullable().optional(),
+  origin: LocationSchema,
+  destination: LocationSchema,
+  meetingPoint: LocationSchema.nullable().optional(),
   availableSeats: z.number().int().min(0),
   price: z.number().min(0),
   departureDate: z.coerce.date().nullable()
