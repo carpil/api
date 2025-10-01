@@ -2,12 +2,14 @@ import { UsersRepository } from '../repositories/firebase/users.repository'
 import { HttpError } from '../utils/http'
 import { User } from '@models/user'
 import { RatingsService } from './ratings.service'
+import { RidesService } from './rides.service'
 import { UserInfo } from '@models/user-info'
 
 export class UsersService {
   constructor(
     private readonly usersRepo: UsersRepository,
-    private readonly ratingsService: RatingsService
+    private readonly ratingsService: RatingsService,
+    private readonly ridesService: RidesService
   ) {}
 
   async signup(currentUser: { uid: string, email?: string }, input: User) {
@@ -78,10 +80,21 @@ export class UsersService {
     if (!user) throw new HttpError(404, 'User not found')
 
     const inRide = !!user.currentRideId
+    let isDriver = false
+
+    if (user.currentRideId) {
+      try {
+        const ride = await this.ridesService.getRideById(user.currentRideId)
+        isDriver = ride.driver.id === userId
+      } catch (error) {
+        console.error('Error getting ride:', error)
+      }
+    }
+
     const pendingRatings = await this.ratingsService.listAllPendingForUser(userId)
     
     if (pendingRatings.pending.length === 0) {
-      return { rideId: null, inRide, pendingReviews: null, isDriver: false }
+      return { rideId: user.currentRideId, inRide, pendingReviews: null, isDriver }
     }
 
     const mostRecentRide = pendingRatings.pending[0]
@@ -92,10 +105,8 @@ export class UsersService {
       role: item.isDriver ? 'driver' : 'passenger'
     }))
 
-    const isDriver = mostRecentRide.ride?.driver?.id === userId
-
     return { 
-      rideId: mostRecentRide.rideId, 
+      rideId: user.currentRideId, 
       inRide, 
       pendingReviews: pendingReviews.length > 0 ? pendingReviews : null,
       isDriver

@@ -6,6 +6,8 @@ import { UsersRepository } from '@repositories/firebase/users.repository'
 import { RidesRepository } from '@repositories/firebase/rides.repository'
 import { RatingsService } from '@services/ratings.service'
 import { RatingsRepository } from '@repositories/firebase/ratings.repository'
+import { RidesService } from '@services/rides.service'
+import { ChatsRepository } from '@repositories/firebase/chats.repository'
 
 const router = Router()
 
@@ -16,6 +18,11 @@ const usersController = new UsersController(
       new RatingsRepository(),
       new RidesRepository(new UsersRepository()),
       new UsersRepository()
+    ),
+    new RidesService(
+      new RidesRepository(new UsersRepository()),
+      new UsersRepository(),
+      new ChatsRepository()
     )
   )
 )
