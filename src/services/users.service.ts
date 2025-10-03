@@ -91,26 +91,44 @@ export class UsersService {
       }
     }
 
-    const pendingRatings = await this.ratingsService.listAllPendingForUser(userId)
+    const pendingReviewRideIds = user.pendingReviewRideIds || []
     
-    if (pendingRatings.pending.length === 0) {
-      return { rideId: user.currentRideId, inRide, pendingReviews: null, isDriver }
-    }
+    // Step 1: If in progress, rideId is currentRideId
+    if (inRide) return { rideId: user.currentRideId, inRide, pendingReviews: null, isDriver }
 
-    const mostRecentRide = pendingRatings.pending[0]
-    const pendingReviews: UserInfo[] = mostRecentRide.pendingUsers.map((item: any) => ({
-      id: item.user.id,
-      name: item.user.name,
-      profilePicture: item.user.profilePicture,
-      role: item.isDriver ? 'driver' : 'passenger'
-    }))
+    // Step 2: If completed but has pending reviews, rideId is the pending ride
+    if (pendingReviewRideIds.length > 0) {
+      const mostRecentRideId = pendingReviewRideIds[0]
+      
+      try {
+        const pendingRide = await this.ratingsService.listPending(mostRecentRideId, userId)
+        
+        if (pendingRide.pendingUserIds.length === 0) {
+          // Step 3: No pending reviews, set rideId to null
+          return { rideId: null, inRide, pendingReviews: null, isDriver }
+        }
 
-    return { 
-      rideId: user.currentRideId, 
-      inRide, 
-      pendingReviews: pendingReviews.length > 0 ? pendingReviews : null,
-      isDriver
+        const pendingReviews: UserInfo[] = pendingRide.pendingUsers.map((item: any) => ({
+          id: item.user.id,
+          name: item.user.name,
+          profilePicture: item.user.profilePicture,
+          role: item.isDriver ? 'driver' : 'passenger'
+        }))
+
+        return { 
+          rideId: mostRecentRideId, 
+          inRide, 
+          pendingReviews: pendingReviews.length > 0 ? pendingReviews : null,
+          isDriver
+        }
+      } catch (error) {
+        console.error('Error getting pending reviews:', error)
+        return { rideId: null, inRide, pendingReviews: null, isDriver }
+      }
     }
+    
+    // Step 3: Completed with no pending reviews, rideId is null
+    return { rideId: null, inRide, pendingReviews: null, isDriver }
   }
 }
 
