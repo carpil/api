@@ -9,7 +9,8 @@ const EnvSchema = z.object({
   FIREBASE_PROJECT_ID: z.string().optional(),
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
-  FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional()
+  FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
+  STRIPE_SECRET_KEY: z.string().optional()
 })
 export type Env = z.infer<typeof EnvSchema>
 
