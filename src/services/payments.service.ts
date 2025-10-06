@@ -1,0 +1,97 @@
+import Stripe from 'stripe'
+import { env } from '../config/env'
+import { CreatePaymentInput, PaymentIntentResponse } from '../models/payment.model'
+import { HttpError } from '../utils/http'
+
+export class PaymentsService {
+  private stripe: Stripe
+
+  constructor() {
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is required')
+    }
+    
+    this.stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-09-30.clover'
+    })
+  }
+
+  /**
+   * Convierte el monto de USD a centavos (unidades menores)
+   */
+  private toMinorUnits(amountInUsd: number): number {
+    return Math.round(amountInUsd * 100)
+  }
+
+  /**
+   * Crea un PaymentIntent de Stripe para un pago único
+   */
+  async createPaymentIntent(paymentData: CreatePaymentInput): Promise<PaymentIntentResponse> {
+    try {
+      const { amount, description } = paymentData
+
+      if (!amount || amount <= 0) {
+        throw new HttpError(400, 'Amount must be greater than 0')
+      }
+
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: this.toMinorUnits(amount),
+        currency: 'usd',
+        description: description ?? 'Carpil ride payment',
+        automatic_payment_methods: { enabled: true }
+      })
+
+      return {
+        clientSecret: paymentIntent.client_secret!
+      }
+    } catch (error: any) {
+      console.error('Error creating payment intent:', error)
+      throw new HttpError(500, `Payment intent creation failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Confirma un PaymentIntent de Stripe
+   */
+  async confirmPaymentIntent(paymentIntentId: string): Promise<boolean> {
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId)
+      
+      if (paymentIntent.status === 'succeeded') {
+        return true
+      }
+      
+      return false
+    } catch (error: any) {
+      console.error('Error confirming payment intent:', error)
+      throw new HttpError(500, `Payment confirmation failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Cancela un PaymentIntent de Stripe
+   */
+  async cancelPaymentIntent(paymentIntentId: string): Promise<boolean> {
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.cancel(paymentIntentId)
+      
+      return paymentIntent.status === 'canceled'
+    } catch (error: any) {
+      console.error('Error canceling payment intent:', error)
+      throw new HttpError(500, `Payment cancellation failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Obtiene el estado de un PaymentIntent
+   */
+  async getPaymentIntentStatus(paymentIntentId: string): Promise<string> {
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId)
+      return paymentIntent.status
+    } catch (error: any) {
+      console.error('Error retrieving payment intent:', error)
+      throw new HttpError(500, `Failed to retrieve payment status: ${error.message}`)
+    }
+  }
+}
