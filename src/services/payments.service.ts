@@ -19,9 +19,9 @@ export class PaymentsService {
   /**
    * Convierte el monto de USD a centavos (unidades menores)
    */
-  private toMinorUnits(amountInUsd: number): number {
-    return Math.round(amountInUsd * 100)
-  }
+  // private toMinorUnits(amountInUsd: number): number {
+  //   return Math.round(amountInUsd * 100)
+  // }
 
   /**
    * Crea un PaymentIntent de Stripe para un pago único
