@@ -35,8 +35,8 @@ export class PaymentsService {
       }
 
       const paymentIntent = await this.stripe.paymentIntents.create({
-        amount: this.toMinorUnits(amount),
-        currency: 'usd',
+        amount: amount,
+        currency: 'crc',
         description: description ?? 'Carpil ride payment',
         automatic_payment_methods: { enabled: true }
       })
