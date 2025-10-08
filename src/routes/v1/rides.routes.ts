@@ -1,26 +1,24 @@
 import { Router } from 'express'
 import { authenticate } from '../../middlewares/auth.middleware'
 import { RidesController } from '../../controllers/rides.controller'
-import { RidesService } from '../../services/rides.service'
-import { RidesRepository } from '../../repositories/firebase/rides.repository'
-import { UsersRepository } from '../../repositories/firebase/users.repository'
-import { ChatsRepository } from '../../repositories/firebase/chats.repository'
+import { PaymentsController } from '../../controllers/payments.controller'
 import { validateBody } from '../../middlewares/validation.middleware'
 import { CreateRideSchema } from '../../models/ride.model'
 
-const router = Router()
+const createRidesRouter = (ridesController: RidesController, paymentsController: PaymentsController) => {
+  const router = Router()
 
-const ridesController = new RidesController(
-  new RidesService(new RidesRepository(new UsersRepository()), new UsersRepository(), new ChatsRepository())
-)
+  router.get('/drivers', (req, res, next) => ridesController.listDrivers(req, res, next))
+  router.get('/drivers/:id', authenticate, (req, res, next) => ridesController.getById(req, res, next))
+  router.post('/', authenticate, validateBody(CreateRideSchema), (req, res, next) => ridesController.create(req, res, next))
+  router.post('/:id/join', authenticate, (req, res, next) => ridesController.join(req, res, next))
+  router.post('/:id/start', authenticate, (req, res, next) => ridesController.start(req, res, next))
+  router.post('/:id/complete', authenticate, (req, res, next) => ridesController.complete(req, res, next))
+  router.get('/:id/payments', authenticate, (req, res, next) => paymentsController.getPaymentsByRide(req, res, next))
 
-router.get('/drivers', ridesController.listDrivers)
-router.get('/drivers/:id', authenticate, ridesController.getById)
-router.post('/', authenticate, validateBody(CreateRideSchema), ridesController.create)
-router.post('/:id/join', authenticate, ridesController.join)
-router.post('/:id/start', authenticate, ridesController.start)
-router.post('/:id/complete', authenticate, ridesController.complete)
+  return router
+}
 
-export default router
+export default createRidesRouter
 
 

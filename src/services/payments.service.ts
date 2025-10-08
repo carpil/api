@@ -1,12 +1,14 @@
 import Stripe from 'stripe'
 import { env } from '../config/env'
-import { CreatePaymentInput, PaymentIntentResponse } from '../models/payment.model'
+import { CreatePaymentInput, PaymentIntentResponse, Payment } from '../models/payment.model'
 import { HttpError } from '../utils/http'
+import { PaymentsRepository } from '../repositories/firebase/payments.repository'
 
 export class PaymentsService {
   private stripe: Stripe
+  private paymentsRepo: PaymentsRepository
 
-  constructor() {
+  constructor(paymentsRepo: PaymentsRepository) {
     if (!env.STRIPE_SECRET_KEY) {
       throw new Error('STRIPE_SECRET_KEY is required')
     }
@@ -14,6 +16,7 @@ export class PaymentsService {
     this.stripe = new Stripe(env.STRIPE_SECRET_KEY, {
       apiVersion: '2025-09-30.clover'
     })
+    this.paymentsRepo = paymentsRepo
   }
 
   /**
@@ -26,13 +29,16 @@ export class PaymentsService {
   /**
    * Crea un PaymentIntent de Stripe para un pago único
    */
-  async createPaymentIntent(paymentData: CreatePaymentInput): Promise<PaymentIntentResponse> {
+  async createPaymentIntent(paymentData: CreatePaymentInput): Promise<PaymentIntentResponse & { paymentId: string }> {
     try {
-      const { amount, description } = paymentData
+      const { amount, description, rideId } = paymentData
 
       if (!amount || amount <= 0) {
         throw new HttpError(400, 'Amount must be greater than 0')
       }
+
+      // Create payment record in Firebase first
+      const payment = await this.paymentsRepo.createPayment(rideId, paymentData)
 
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: amount,
@@ -41,8 +47,17 @@ export class PaymentsService {
         automatic_payment_methods: { enabled: true }
       })
 
+      // Update payment with Stripe details
+      await this.paymentsRepo.updatePaymentWithStripeDetails(
+        rideId,
+        payment.id,
+        paymentIntent.id,
+        paymentIntent.client_secret!
+      )
+
       return {
-        clientSecret: paymentIntent.client_secret!
+        clientSecret: paymentIntent.client_secret!,
+        paymentId: payment.id
       }
     } catch (error: any) {
       console.error('Error creating payment intent:', error)
@@ -93,5 +108,34 @@ export class PaymentsService {
       console.error('Error retrieving payment intent:', error)
       throw new HttpError(500, `Failed to retrieve payment status: ${error.message}`)
     }
+  }
+
+  /**
+   * Get all payments for a ride
+   */
+  async getPaymentsByRide(rideId: string): Promise<Payment[]> {
+    return this.paymentsRepo.getPaymentsByRide(rideId)
+  }
+
+  /**
+   * Get payment by Stripe PaymentIntent ID
+   */
+  async getPaymentByIntentId(paymentIntentId: string): Promise<Payment | null> {
+    return this.paymentsRepo.getPaymentByIntentId(paymentIntentId)
+  }
+
+  /**
+   * Update payment status
+   */
+  async updatePaymentStatus(rideId: string, paymentId: string, status: string): Promise<void> {
+    const paymentStatus = status as any // Cast to PaymentStatus enum
+    await this.paymentsRepo.updatePaymentStatus(rideId, paymentId, paymentStatus)
+  }
+
+  /**
+   * Check if all passengers have paid for a ride
+   */
+  async checkAllPaymentsPaid(rideId: string): Promise<boolean> {
+    return this.paymentsRepo.checkAllPaymentsPaid(rideId)
   }
 }

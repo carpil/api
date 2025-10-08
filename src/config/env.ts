@@ -10,7 +10,8 @@ const EnvSchema = z.object({
   FIREBASE_CLIENT_EMAIL: z.string().optional(),
   FIREBASE_PRIVATE_KEY: z.string().optional(),
   FIREBASE_SERVICE_ACCOUNT_PATH: z.string().optional(),
-  STRIPE_SECRET_KEY: z.string().optional()
+  STRIPE_SECRET_KEY: z.string().min(1, 'STRIPE_SECRET_KEY is required'),
+  STRIPE_WEBHOOK_SECRET: z.string().optional()
 })
 export type Env = z.infer<typeof EnvSchema>
 

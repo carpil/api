@@ -1,20 +1,39 @@
 import { Router } from 'express'
-import ridesRouter from './v1/rides.routes'
-import chatsRouter from './v1/chats.routes'
-import ratingsRouter from './v1/ratings.routes'
-import notificationsRouter from './v1/notifications.routes'
-import usersRouter from './v1/users.routes'
-import paymentsRouter from './v1/payments.routes'
+import { PaymentsController } from '../controllers/payments.controller'
+import { RidesController } from '../controllers/rides.controller'
+import { UsersController } from '../controllers/users.controller'
+import { ChatsController } from '../controllers/chats.controller'
+import { RatingsController } from '../controllers/ratings.controller'
+import { NotificationsController } from '../controllers/notifications.controller'
+import createRidesRouter from './v1/rides.routes'
+import createChatsRouter from './v1/chats.routes'
+import createRatingsRouter from './v1/ratings.routes'
+import createNotificationsRouter from './v1/notifications.routes'
+import createUsersRouter from './v1/users.routes'
+import createPaymentsRouter from './v1/payments.routes'
 
-const router = Router()
+export interface Controllers {
+  paymentsController: PaymentsController
+  ridesController: RidesController
+  usersController: UsersController
+  chatsController: ChatsController
+  ratingsController: RatingsController
+  notificationsController: NotificationsController
+}
 
-router.use('/v1/rides', ridesRouter)
-router.use('/v1/chats', chatsRouter)
-router.use('/v1/ratings', ratingsRouter)
-router.use('/v1/notifications', notificationsRouter)
-router.use('/v1/users', usersRouter)
-router.use('/v1/payments', paymentsRouter)
+const createRoutes = (controllers: Controllers) => {
+  const router = Router()
 
-export default router
+  router.use('/v1/rides', createRidesRouter(controllers.ridesController, controllers.paymentsController))
+  router.use('/v1/chats', createChatsRouter(controllers.chatsController))
+  router.use('/v1/ratings', createRatingsRouter(controllers.ratingsController))
+  router.use('/v1/notifications', createNotificationsRouter(controllers.notificationsController))
+  router.use('/v1/users', createUsersRouter(controllers.usersController))
+  router.use('/v1/payments', createPaymentsRouter(controllers.paymentsController))
+
+  return router
+}
+
+export default createRoutes
 
 
