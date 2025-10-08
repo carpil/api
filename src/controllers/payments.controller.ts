@@ -98,4 +98,26 @@ export class PaymentsController {
       message: 'Payment status retrieved successfully'
     })
   })
+
+  getPaymentsByRide = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { id: rideId } = req.params
+    const userId = req.user?.uid
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' })
+    }
+
+    if (!rideId) {
+      return res.status(400).json({ error: 'Ride ID is required' })
+    }
+
+    // Get payments for the ride
+    const payments = await this.paymentsService.getPaymentsByRide(rideId)
+    
+    return res.json({
+      success: true,
+      payments,
+      message: 'Ride payments retrieved successfully'
+    })
+  })
 }

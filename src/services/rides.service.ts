@@ -1,6 +1,7 @@
 import { RidesRepository } from '../repositories/firebase/rides.repository'
 import { UsersRepository } from '../repositories/firebase/users.repository'
 import { ChatsRepository } from '../repositories/firebase/chats.repository'
+import { PaymentsRepository } from '../repositories/firebase/payments.repository'
 import { CreateRideInput, Ride, RideStatus } from '../models/ride.model'
 import { HttpError } from '../utils/http'
 import { Expo } from 'expo-server-sdk'
@@ -16,7 +17,8 @@ export class RidesService {
   constructor(
     private readonly ridesRepo: RidesRepository,
     private readonly usersRepo: UsersRepository,
-    private readonly chatsRepo: ChatsRepository
+    private readonly chatsRepo: ChatsRepository,
+    private readonly paymentsRepo: PaymentsRepository
   ) {}
 
   async createRide(driverId: string, rideData: CreateRideInput): Promise<Ride> {
@@ -135,10 +137,12 @@ export class RidesService {
     const participantsIds = [ride.driver?.id, ...(Array.isArray(ride.passengers) ? ride.passengers.map(p => p.id) : [])].filter(Boolean) as string[]
     const driverPendingTargets = participantsIds.filter(id => id !== driverId).length > 0
 
-    await this.ridesRepo.update(rideId, { status: RideStatus.Completed, completedAt: new Date(), updatedAt: new Date() })
+    // Set ride status to on-checkout instead of completed
+    await this.ridesRepo.update(rideId, { status: RideStatus.OnCheckout, completedAt: new Date(), updatedAt: new Date() })
     await this.usersRepo.update(driverId, { currentRideId: null })
     await this.ridesRepo.setParticipant(rideId, driverId, { active: false, pendingToReview: driverPendingTargets })
 
+    // Driver can review immediately (doesn't need to pay)
     if (driverPendingTargets) {
       await this.addPendingReviewRide(driverId, rideId)
     }
@@ -146,15 +150,26 @@ export class RidesService {
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const pushNotifications: any[] = []
 
+    // Create payment records for each passenger
     for (const passenger of passengers) {
       const passengerUser = await this.usersRepo.getById(passenger.id)
       await this.usersRepo.update(passenger.id, { currentRideId: null })
-      const passengerPendingTargets = participantsIds.filter(id => id !== passenger.id).length > 0
-      await this.ridesRepo.setParticipant(rideId, passenger.id, { active: false, pendingToReview: passengerPendingTargets })
+      
+      // Create payment record for passenger
+      await this.paymentsRepo.createPayment(rideId, {
+        userId: passenger.id,
+        amount: ride.price,
+        rideId,
+        description: `Pago del viaje ${rideId}`
+      })
 
-      if (passengerPendingTargets) {
-        await this.addPendingReviewRide(passenger.id, rideId)
-      }
+      // Add to pendingPaymentRideIds (not pendingReviewRideIds yet)
+      const currentPendingPayment = passengerUser?.pendingPaymentRideIds || []
+      const updatedPendingPayment = [rideId, ...currentPendingPayment.filter(id => id !== rideId)]
+      await this.usersRepo.update(passenger.id, { pendingPaymentRideIds: updatedPendingPayment })
+
+      // DO NOT add to pendingReviewRideIds until payment is confirmed
+      await this.ridesRepo.setParticipant(rideId, passenger.id, { active: false, pendingToReview: false })
 
       const pushTokens = passengerUser?.pushToken || []
       for (const pushToken of pushTokens) {
@@ -163,7 +178,7 @@ export class RidesService {
             to: pushToken,
             sound: 'default',
             title: 'Viaje completado',
-            body: 'El conductor ha completado el viaje.',
+            body: 'El viaje ha finalizado. Por favor procede al pago.',
             data: { rideId, driverId }
           })
         }

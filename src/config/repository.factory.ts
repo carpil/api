@@ -1,6 +1,11 @@
 // Repository Factory - Easy way to switch between different database implementations
 import { IUsersRepository } from '@interfaces/repositories.interface'
 import { UsersRepository } from '../repositories/firebase/users.repository'
+import { RidesRepository } from '../repositories/firebase/rides.repository'
+import { ChatsRepository } from '../repositories/firebase/chats.repository'
+import { PaymentsRepository } from '../repositories/firebase/payments.repository'
+import { RatingsRepository } from '../repositories/firebase/ratings.repository'
+import { NotificationsRepository } from '../repositories/firebase/notifications.repository'
 // Future database implementations can be added here
 
 export type DatabaseType = 'firebase' | 'postgresql' | 'mongodb'
@@ -10,16 +15,53 @@ export class RepositoryFactory {
     switch (dbType) {
       case 'firebase':
         return new UsersRepository()
-      // case 'postgresql':
-      //   return new PostgreSQLUsersRepository()
-      // case 'mongodb':
-      //   return new MongoDBUsersRepository()
       default:
         throw new Error(`Unsupported database type: ${dbType}`)
     }
   }
 
-  // You can add more factory methods for other repositories
-  // static createRidesRepository(dbType: DatabaseType): IRidesRepository { ... }
-  // static createChatsRepository(dbType: DatabaseType): IChatsRepository { ... }
+  static createRidesRepository(dbType: DatabaseType = 'firebase'): RidesRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new RidesRepository(new UsersRepository())
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
+
+  static createChatsRepository(dbType: DatabaseType = 'firebase'): ChatsRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new ChatsRepository()
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
+
+  static createPaymentsRepository(dbType: DatabaseType = 'firebase'): PaymentsRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new PaymentsRepository()
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
+
+  static createRatingsRepository(dbType: DatabaseType = 'firebase'): RatingsRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new RatingsRepository()
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
+
+  static createNotificationsRepository(dbType: DatabaseType = 'firebase'): NotificationsRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new NotificationsRepository()
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
 }
