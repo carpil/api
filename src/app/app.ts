@@ -21,7 +21,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const app = express()
   
   // Configure webhook route BEFORE express.json() middleware
-  app.post('/webhooks/stripe', express.raw(), (req, res, next) => {
+  app.post('/webhooks/stripe', express.raw({ type: '*/*' }), (req, res, next) => {
     webhooksController.handleStripeWebhook(req, res).catch(next)
   })
   
