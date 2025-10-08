@@ -4,6 +4,7 @@ export enum RideStatus {
   Active = 'active',
   InProgress = 'in_progress',
   InRoute = 'in_route',
+  OnCheckout = 'on_checkout',
   Canceled = 'canceled',
   Completed = 'completed'
 }
