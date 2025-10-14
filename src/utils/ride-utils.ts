@@ -27,7 +27,6 @@ export async function getRide({ id }: { id: string }): Promise<Ride | null> {
 
     return ride
   } catch (error) {
-    console.error('Error getting ride:', error)
     return null
   }
 } 

@@ -21,17 +21,10 @@ export class WebhooksController {
   }
 
   handleStripeWebhook = async (req: Request, res: Response): Promise<void> => {
-    console.log('Webhook received:', {
-      bodyType: typeof req.body,
-      bodyLength: req.body?.length,
-      headers: req.headers['stripe-signature'] ? 'present' : 'missing'
-    })
-    
     const sig = req.headers['stripe-signature'] as string
     const endpointSecret = env.STRIPE_WEBHOOK_SECRET
 
     if (!endpointSecret) {
-      console.error('STRIPE_WEBHOOK_SECRET is not configured')
       res.status(500).json({ error: 'Webhook secret not configured' })
       return
     }
@@ -41,7 +34,6 @@ export class WebhooksController {
     try {
       event = this.stripe.webhooks.constructEvent(req.body, sig, endpointSecret)
     } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message)
       res.status(400).json({ error: `Webhook signature verification failed: ${err.message}` })
       return
     }
@@ -55,23 +47,19 @@ export class WebhooksController {
           await this.handlePaymentFailure(event.data.object as Stripe.PaymentIntent)
           break
         default:
-          console.log(`Unhandled event type: ${event.type} - ignoring`)
+          break
       }
 
       res.json({ received: true })
     } catch (error: any) {
-      console.error('Error processing webhook:', error)
       res.status(500).json({ error: 'Webhook processing failed' })
     }
   }
 
   private async handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
-    console.log('Payment succeeded:', paymentIntent.id)
-
     try {
       const payment = await this.paymentsService.getPaymentByIntentId(paymentIntent.id)
       if (!payment) {
-        console.log('Payment record not found for intent (likely test event):', paymentIntent.id)
         return
       }
 
@@ -93,7 +81,6 @@ export class WebhooksController {
 
       const user = await this.usersRepo.getById(payment.userId)
       if (!user) {
-        console.error('User not found for payment:', payment.userId)
         return
       }
 
@@ -122,23 +109,16 @@ export class WebhooksController {
           status: RideStatus.Completed,
           updatedAt: new Date()
         })
-        console.log('All payments completed for ride:', payment.rideId)
       }
-
-      console.log('Payment processing completed for user:', payment.userId)
     } catch (error: any) {
-      console.error('Error handling payment success:', error)
-      console.log('Continuing webhook processing despite error')
+      // Continue webhook processing despite error
     }
   }
 
   private async handlePaymentFailure(paymentIntent: Stripe.PaymentIntent) {
-    console.log('Payment failed:', paymentIntent.id)
-
     try {
       const payment = await this.paymentsService.getPaymentByIntentId(paymentIntent.id)
       if (!payment) {
-        console.error('Payment record not found for intent:', paymentIntent.id)
         return
       }
 
@@ -158,10 +138,7 @@ export class WebhooksController {
           paymentAttempts: attempts
         })
       }
-
-      console.log('Payment failure processed for user:', payment.userId)
     } catch (error: any) {
-      console.error('Error handling payment failure:', error)
       throw error
     }
   }

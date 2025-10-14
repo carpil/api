@@ -88,7 +88,6 @@ export class UsersService {
         const ride = await this.ridesService.getRideById(user.currentRideId)
         isDriver = ride.driver.id === userId
       } catch (error) {
-        console.error('Error getting ride:', error)
       }
     }
 
@@ -116,7 +115,7 @@ export class UsersService {
           }
         }
       } catch (error) {
-        console.error('Error getting pending payment ride:', error)
+        // Non-critical error
       }
     }
 
@@ -140,7 +139,7 @@ export class UsersService {
           }))
         }
       } catch (error) {
-        console.error('Error getting pending reviews:', error)
+        // Non-critical error
       }
     }
 
