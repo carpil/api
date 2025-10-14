@@ -11,7 +11,6 @@ export const decryptMessage = (ciphertext: string): string => {
     const bytes = CryptoJS.AES.decrypt(ciphertext, secretKey)
     return bytes.toString(CryptoJS.enc.Utf8)
   } catch (error) {
-    console.error('Error decrypting message:', error)
     return ciphertext
   }
 } 

@@ -8,7 +8,6 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   }
   const status = (err as any)?.status ?? 500
   const message = (err as any)?.message ?? 'Internal server error'
-  console.error(err)
   res.status(status).json({ message })
 }
 

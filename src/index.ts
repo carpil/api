@@ -201,9 +201,7 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
 
   try {
     await chatRef.set(chat)
-    console.debug('Chat created for ride:', { rideId: rideRef.id, chatId: chatRef.id, driverId: currentUserId })
   } catch (error) {
-    console.error('Failed to create chat for ride:', { rideId: rideRef.id, error })
     // Don't fail the ride creation if chat creation fails
   }
 
@@ -214,7 +212,7 @@ app.post('/rides', authenticate, async (req: AuthRequest, res) => {
     })
     ride.chatId = chatRef.id
   } catch (error) {
-    console.error('Failed to update ride with chat ID:', { rideId: rideRef.id, chatId: chatRef.id, error })
+    // Non-critical error
   }
 
   res.json({ ride })
@@ -283,9 +281,7 @@ app.post('/rides/:id/join', authenticate, async (req: AuthRequest, res) => {
         participants: FieldValue.arrayUnion(currentUserId),
         updatedAt: new Date()
       })
-      console.debug('Passenger added to chat:', { rideId, chatId: ride.chatId, passengerId: currentUserId })
     } catch (error) {
-      console.error('Failed to add passenger to chat:', { rideId, chatId: ride.chatId, passengerId: currentUserId, error })
       res.status(500).json({ message: 'Failed to add passenger to chat' })
       return
     }
@@ -338,7 +334,6 @@ app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
         currentRideId: rideId
       })
     } catch (error) {
-      console.error('Failed to update driver currentRide:', { rideId, driverId: currentUserId, error })
       // Not critical to block
     }
 
@@ -379,22 +374,20 @@ app.post('/rides/:id/start', authenticate, async (req: AuthRequest, res) => {
           }
         }
       } catch (error) {
-        console.error('Error updating passenger inRide or preparing push:', { passengerId: passenger.id, error })
+        // Non-critical error
       }
     }
 
     if (pushMessages.length > 0) {
       try {
-        const receipts = await expo.sendPushNotificationsAsync(pushMessages)
-        console.debug('Ride start push notifications sent:', receipts)
+        await expo.sendPushNotificationsAsync(pushMessages)
       } catch (error) {
-        console.error('Failed to send ride start push notifications:', error)
+        // Non-critical error
       }
     }
 
     res.json({ message: 'Ride started successfully' })
   } catch (error) {
-    console.error('Error starting ride:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -441,7 +434,6 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
         currentRideId: null
       })
     } catch (error) {
-      console.error('Failed to update driver completion state:', { rideId, driverId: currentUserId, error })
       // Not critical to block
     }
 
@@ -484,16 +476,15 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
           }
         }
       } catch (error) {
-        console.error('Error updating passenger flags or preparing push:', { passengerId: passenger.id, error })
+        // Non-critical error
       }
     }
 
     if (pushMessages.length > 0) {
       try {
-        const receipts = await expo.sendPushNotificationsAsync(pushMessages)
-        console.debug('Ride completion push notifications sent:', receipts)
+        await expo.sendPushNotificationsAsync(pushMessages)
       } catch (error) {
-        console.error('Failed to send ride completion push notifications:', error)
+        // Non-critical error
       }
     }
 
@@ -501,7 +492,6 @@ app.post('/rides/:id/complete', authenticate, async (req: AuthRequest, res) => {
 
     res.json({ message: 'Ride completed successfully' })
   } catch (error) {
-    console.error('Error completing ride:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -685,7 +675,6 @@ app.post('/notifications/token', authenticate, async (req: AuthRequest, res) => 
       pushToken
     })
   } catch (error) {
-    console.error('Error updating push token:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -729,7 +718,6 @@ app.post('/notifications/token/remove', authenticate, async (req: AuthRequest, r
       pushToken
     })
   } catch (error) {
-    console.error('Error removing push token:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -748,7 +736,6 @@ app.get('/chats', authenticate, async (req: AuthRequest, res) => {
       .get()
 
     if (chatsSnapshot.empty) {
-      console.log('No chats found for user:', currentUserId)
       res.json([])
       return
     }
@@ -760,8 +747,6 @@ app.get('/chats', authenticate, async (req: AuthRequest, res) => {
       chat.updatedAt = doc.data().updatedAt?.toDate()
       return chat
     })
-
-    console.log('Found chats for user:', currentUserId, 'chat IDs:', chatsFirebase.map(chat => chat.id))
 
     const chats: ChatResponse[] = []
     for (const chat of chatsFirebase) {
@@ -776,8 +761,6 @@ app.get('/chats', authenticate, async (req: AuthRequest, res) => {
 
         if (participantSnapshot.exists) {
           members.push(participantSnapshot.data() as User)
-        } else {
-          console.warn('Participant not found:', { userId: currentUserId, chatId: chat.id, participant, participants: chat.participants })
         }
       }
 
@@ -807,7 +790,6 @@ app.get('/chats', authenticate, async (req: AuthRequest, res) => {
 
     res.json(chats)
   } catch (error) {
-    console.error('Error fetching chats:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -874,7 +856,6 @@ app.get('/chats/:id', authenticate, async (req: AuthRequest, res) => {
           }
         })
       } catch (error) {
-        console.error('Error updating chat last message seenBy:', error)
         res.status(500).json({ message: 'Internal server error' })
         return
       }
@@ -898,7 +879,6 @@ app.get('/chats/:id', authenticate, async (req: AuthRequest, res) => {
 
     res.json(chatResponse)
   } catch (error) {
-    console.error('Error fetching chat:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -916,14 +896,12 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
     const chatSnapshot = await firestore.collection('chats').doc(chatId).get()
 
     if (!chatSnapshot.exists) {
-      console.error('Chat not found:', { chatId, userId: currentUserId })
       res.status(404).json({ error: 'Chat not found' })
       return
     }
 
     const chat = chatSnapshot.data() as Chat
     if (!chat.participants.includes(currentUserId)) {
-      console.error('User is not a participant of chat:', { chatId, userId: currentUserId, participants: chat.participants })
       res.status(403).json({ error: 'You are not a participant of this chat' })
       return
     }
@@ -935,17 +913,14 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
 
     const oneMinuteAgo = new Date(Date.now() - 60000)
     const recentMessages = userMessagesSnapshot.docs.filter(doc => doc.createTime.toDate() > oneMinuteAgo)
-    console.debug('Recent messages:', { userId: currentUserId, chatId, recentMessages: recentMessages.map(doc => doc.id) })
 
     if (recentMessages.length >= 10) {
-      console.error('Too many messages in a short period of time:', { userId: currentUserId, chatId })
       res.status(429).json({ message: 'Too many messages in a short period of time' })
       return
     }
 
     const messageRequest = validateMessage(req.body)
     if (!messageRequest.success) {
-      console.error('Message schema validation failed:', { userId: currentUserId, chatId, error: messageRequest.error })
       res.status(400).json({ message: 'Invalid request' })
       return
     }
@@ -961,18 +936,14 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
 
     try {
       await newMessageRef.add(newMessage)
-      console.debug('Message added:', { userId: currentUserId, chatId, message: newMessage.id })
     } catch (error) {
-      console.error('Cannot add message:', { userId: currentUserId, chatId, error })
       res.status(500).json({ message: 'Internal server error' })
       return
     }
 
     try {
       await firestore.collection('chats').doc(chatId).update({ lastMessage: newMessage })
-      console.debug('Chat last message updated:', { userId: currentUserId, chatId, message: newMessage.id })
     } catch (error) {
-      console.error('Cannot update chat last message:', { userId: currentUserId, chatId, error })
       res.status(500).json({ message: 'Internal server error' })
       return
     }
@@ -1001,23 +972,20 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
           }
         }
       } catch (error) {
-        console.error('Error getting participant data for push:', { participantId, error })
+        // Non-critical error
       }
     }
 
     if (pushMessages.length > 0) {
       try {
-        const receipts = await expo.sendPushNotificationsAsync(pushMessages)
-        console.debug('Push notifications sent:', receipts)
+        await expo.sendPushNotificationsAsync(pushMessages)
       } catch (error) {
-        console.error('Failed to send push notifications:', error)
+        // Non-critical error
       }
     }
 
-    console.info('Message sent:', { userId: currentUserId, chatId })
     res.json({ message: 'Message sent successfully' })
   } catch (error) {
-    console.error('Error sending message:', error)
     res.status(500).json({ message: 'Internal server error' })
   }
 })
@@ -1066,9 +1034,7 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
   // create rating in firestore
   try {
     await ratingRef.set(rating)
-    console.debug('Rating added:', { userId: currentUserId, rideId: ratingRequest.data.rideId })
   } catch (error) {
-    console.error('Cannot add rating:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
     res.status(500).json({ message: 'Internal server error' })
     return
   }
@@ -1081,9 +1047,7 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
 
   try {
     await rideRef.ref.set({ ratings: rideRatings }, { merge: true })
-    console.debug('Ride ratings updated:', { userId: currentUserId, rideId: ratingRequest.data.rideId })
   } catch (error) {
-    console.error('Cannot update ride ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
     res.status(500).json({ message: 'Internal server error' })
     return
   }
@@ -1101,9 +1065,7 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
   
   try {
     await userRef.ref.set({ averageRating: user.averageRating })
-    console.debug('User average rating updated:', { userId: ratingRequest.data.targetUserId })
   } catch (error) {
-    console.error('Cannot update user average rating:', { userId: ratingRequest.data.targetUserId, error })
     res.status(500).json({ message: 'Internal server error' })
     return
   }
@@ -1135,11 +1097,11 @@ app.post('/ratings', authenticate, async (req: AuthRequest, res) => {
             pendingToReview: false
           }, { merge: true })
       } catch (error) {
-        console.error('Failed to unset pendingToReview after completing ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
+        // Non-critical error
       }
     }
   } catch (error) {
-    console.error('Error validating completed ratings:', { userId: currentUserId, rideId: ratingRequest.data.rideId, error })
+    // Non-critical error
   }
 
   res.json({ message: 'Rating added successfully' })
@@ -1198,7 +1160,6 @@ app.get('/rides/:id/ratings/pending', authenticate, async (req: AuthRequest, res
 
     res.json({ rideId, pendingUserIds: pending, pendingUsers })
   } catch (error) {
-    console.error('Error fetching pending ratings:', { rideId, userId: currentUserId, error })
     res.status(500).json({ message: 'Internal server error' })
   }
 })

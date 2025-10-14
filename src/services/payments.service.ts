@@ -73,7 +73,6 @@ export class PaymentsService {
         paymentId: payment.id
       }
     } catch (error: any) {
-      console.error('Error creating payment intent:', error)
       throw new HttpError(500, `Payment intent creation failed: ${error.message}`)
     }
   }
@@ -91,7 +90,6 @@ export class PaymentsService {
       
       return false
     } catch (error: any) {
-      console.error('Error confirming payment intent:', error)
       throw new HttpError(500, `Payment confirmation failed: ${error.message}`)
     }
   }
@@ -105,7 +103,6 @@ export class PaymentsService {
       
       return paymentIntent.status === 'canceled'
     } catch (error: any) {
-      console.error('Error canceling payment intent:', error)
       throw new HttpError(500, `Payment cancellation failed: ${error.message}`)
     }
   }
@@ -118,7 +115,6 @@ export class PaymentsService {
       const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentIntentId)
       return paymentIntent.status
     } catch (error: any) {
-      console.error('Error retrieving payment intent:', error)
       throw new HttpError(500, `Failed to retrieve payment status: ${error.message}`)
     }
   }
