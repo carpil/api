@@ -1,5 +1,5 @@
-import { firestore } from 'config/firebase'
-import { Payment, PaymentStatus, CreatePaymentInput } from '@models/payment.model'
+import { firestore, FieldValue } from 'config/firebase'
+import { Payment, PaymentStatus, CreatePaymentInput, PaymentAttempt } from '@models/payment.model'
 
 export class PaymentsRepository {
   /**
@@ -20,6 +20,7 @@ export class PaymentsRepository {
       currency: 'crc',
       status: PaymentStatus.Pending,
       description: paymentData.description,
+      paymentAttempts: [],
       createdAt: new Date(),
       updatedAt: new Date()
     }
@@ -45,7 +46,11 @@ export class PaymentsRepository {
         id: doc.id,
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
-        completedAt: data.completedAt?.toDate()
+        completedAt: data.completedAt?.toDate(),
+        paymentAttempts: data.paymentAttempts?.map((attempt: any) => ({
+          ...attempt,
+          timestamp: attempt.timestamp?.toDate()
+        })) || []
       } as Payment
     })
   }
@@ -71,7 +76,11 @@ export class PaymentsRepository {
       id: doc.id,
       createdAt: data.createdAt?.toDate(),
       updatedAt: data.updatedAt?.toDate(),
-      completedAt: data.completedAt?.toDate()
+      completedAt: data.completedAt?.toDate(),
+      paymentAttempts: data.paymentAttempts?.map((attempt: any) => ({
+        ...attempt,
+        timestamp: attempt.timestamp?.toDate()
+      })) || []
     } as Payment
   }
 
@@ -113,6 +122,7 @@ export class PaymentsRepository {
       .update({
         stripePaymentIntentId,
         stripeClientSecret,
+        status: PaymentStatus.Processing,
         updatedAt: new Date()
       })
   }
@@ -153,7 +163,35 @@ export class PaymentsRepository {
       id: doc.id,
       createdAt: data.createdAt?.toDate(),
       updatedAt: data.updatedAt?.toDate(),
-      completedAt: data.completedAt?.toDate()
+      completedAt: data.completedAt?.toDate(),
+      paymentAttempts: data.paymentAttempts?.map((attempt: any) => ({
+        ...attempt,
+        timestamp: attempt.timestamp?.toDate()
+      })) || []
     } as Payment
+  }
+
+  async addPaymentAttempt(rideId: string, paymentId: string, attempt: PaymentAttempt): Promise<void> {
+    await firestore
+      .collection('rides')
+      .doc(rideId)
+      .collection('payments')
+      .doc(paymentId)
+      .update({
+        paymentAttempts: FieldValue.arrayUnion(attempt),
+        updatedAt: new Date()
+      })
+  }
+
+  async update(rideId: string, paymentId: string, data: Partial<Payment>): Promise<void> {
+    await firestore
+      .collection('rides')
+      .doc(rideId)
+      .collection('payments')
+      .doc(paymentId)
+      .update({
+        ...data,
+        updatedAt: new Date()
+      })
   }
 }
