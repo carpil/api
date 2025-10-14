@@ -4,6 +4,7 @@ import { User } from '@models/user'
 import { RatingsService } from './ratings.service'
 import { RidesService } from './rides.service'
 import { UserInfo } from '@models/user-info'
+import { RideInfo } from '@models/ride-info'
 
 export class UsersService {
   constructor(
@@ -92,44 +93,71 @@ export class UsersService {
     }
 
     const pendingReviewRideIds = user.pendingReviewRideIds || []
+    const pendingPaymentRideIds = user.pendingPaymentRideIds || []
     
     // Step 1: If in progress, rideId is currentRideId
-    if (inRide) return { rideId: user.currentRideId, inRide, pendingReviews: null, isDriver }
+    if (inRide) return { rideId: user.currentRideId, inRide, pendingReviews: null, pendingPayment: null, isDriver }
 
-    // Step 2: If completed but has pending reviews, rideId is the pending ride
+    // Step 2: Check for pending payments (non-drivers only)
+    let pendingPayment: RideInfo | null = null
+    if (pendingPaymentRideIds.length > 0) {
+      const mostRecentPaymentRideId = pendingPaymentRideIds[0]
+      
+      try {
+        const ride = await this.ridesService.getRideById(mostRecentPaymentRideId)
+        // Only create pendingPayment info if user is not the driver
+        if (ride.driver.id !== userId) {
+          pendingPayment = {
+            rideId: ride.id,
+            origin: ride.origin,
+            destination: ride.destination,
+            price: ride.price,
+            completedAt: ride.completedAt || new Date()
+          }
+        }
+      } catch (error) {
+        console.error('Error getting pending payment ride:', error)
+      }
+    }
+
+    // Step 3: Check for pending reviews
+    let pendingReviews: UserInfo[] | null = null
+    let rideId: string | null = null
+    
     if (pendingReviewRideIds.length > 0) {
       const mostRecentRideId = pendingReviewRideIds[0]
+      rideId = mostRecentRideId
       
       try {
         const pendingRide = await this.ratingsService.listPending(mostRecentRideId, userId)
         
-        if (pendingRide.pendingUserIds.length === 0) {
-          // Step 3: No pending reviews, set rideId to null
-          return { rideId: null, inRide, pendingReviews: null, isDriver }
-        }
-
-        const pendingReviews: UserInfo[] = pendingRide.pendingUsers.map((item: any) => ({
-          id: item.user.id,
-          name: item.user.name,
-          profilePicture: item.user.profilePicture,
-          role: item.isDriver ? 'driver' : 'passenger'
-        }))
-
-        return { 
-          rideId: mostRecentRideId, 
-          inRide, 
-          pendingReviews: pendingReviews.length > 0 ? pendingReviews : null,
-          isDriver
+        if (pendingRide.pendingUserIds.length > 0) {
+          pendingReviews = pendingRide.pendingUsers.map((item: any) => ({
+            id: item.user.id,
+            name: item.user.name,
+            profilePicture: item.user.profilePicture,
+            role: item.isDriver ? 'driver' : 'passenger'
+          }))
         }
       } catch (error) {
         console.error('Error getting pending reviews:', error)
-        return { rideId: null, inRide, pendingReviews: null, isDriver }
       }
     }
-    
-    // Step 3: Completed with no pending reviews, rideId is null
-    return { rideId: null, inRide, pendingReviews: null, isDriver }
+
+    // If there's a pending payment, use that rideId
+    if (pendingPayment) {
+      rideId = pendingPayment.rideId
+    }
+
+    return { 
+      rideId, 
+      inRide, 
+      pendingReviews,
+      pendingPayment,
+      isDriver
+    }
   }
 }
+
 
 
