@@ -69,28 +69,34 @@ export class WebhooksController {
     console.log('Payment succeeded:', paymentIntent.id)
 
     try {
-      // Find the payment record
       const payment = await this.paymentsService.getPaymentByIntentId(paymentIntent.id)
       if (!payment) {
         console.log('Payment record not found for intent (likely test event):', paymentIntent.id)
         return
       }
 
-      // Update payment status to succeeded
       await this.paymentsService.updatePaymentStatus(
         payment.rideId,
         payment.id,
         PaymentStatus.Succeeded
       )
 
-      // Get user to update their pending arrays
+      const attempts = payment.paymentAttempts || []
+      const attemptIndex = attempts.findIndex(a => a.stripePaymentIntentId === paymentIntent.id)
+      
+      if (attemptIndex >= 0) {
+        attempts[attemptIndex].status = 'succeeded'
+        await this.paymentsService['paymentsRepo'].update(payment.rideId, payment.id, {
+          paymentAttempts: attempts
+        })
+      }
+
       const user = await this.usersRepo.getById(payment.userId)
       if (!user) {
         console.error('User not found for payment:', payment.userId)
         return
       }
 
-      // Remove from pendingPaymentRideIds
       const updatedPendingPayment = (user.pendingPaymentRideIds || []).filter(
         id => id !== payment.rideId
       )
@@ -98,24 +104,20 @@ export class WebhooksController {
         pendingPaymentRideIds: updatedPendingPayment
       })
 
-      // Add to pendingReviewRideIds (now they can review)
       const currentPendingReview = user.pendingReviewRideIds || []
       const updatedPendingReview = [payment.rideId, ...currentPendingReview.filter(id => id !== payment.rideId)]
       await this.usersRepo.update(payment.userId, {
         pendingReviewRideIds: updatedPendingReview
       })
 
-      // Update participant status to allow reviews
       await this.ridesService['ridesRepo'].setParticipant(
         payment.rideId,
         payment.userId,
         { active: false, pendingToReview: true }
       )
 
-      // Check if all passengers have paid
       const allPaid = await this.paymentsService.checkAllPaymentsPaid(payment.rideId)
       if (allPaid) {
-        // Update ride status from on-checkout to completed
         await this.ridesService['ridesRepo'].update(payment.rideId, {
           status: RideStatus.Completed,
           updatedAt: new Date()
@@ -126,7 +128,6 @@ export class WebhooksController {
       console.log('Payment processing completed for user:', payment.userId)
     } catch (error: any) {
       console.error('Error handling payment success:', error)
-      // Don't throw error to avoid breaking webhook processing
       console.log('Continuing webhook processing despite error')
     }
   }
@@ -135,19 +136,28 @@ export class WebhooksController {
     console.log('Payment failed:', paymentIntent.id)
 
     try {
-      // Find the payment record
       const payment = await this.paymentsService.getPaymentByIntentId(paymentIntent.id)
       if (!payment) {
         console.error('Payment record not found for intent:', paymentIntent.id)
         return
       }
 
-      // Update payment status to failed
       await this.paymentsService.updatePaymentStatus(
         payment.rideId,
         payment.id,
         PaymentStatus.Failed
       )
+
+      const attempts = payment.paymentAttempts || []
+      const attemptIndex = attempts.findIndex(a => a.stripePaymentIntentId === paymentIntent.id)
+      
+      if (attemptIndex >= 0) {
+        attempts[attemptIndex].status = 'failed'
+        attempts[attemptIndex].errorMessage = paymentIntent.last_payment_error?.message
+        await this.paymentsService['paymentsRepo'].update(payment.rideId, payment.id, {
+          paymentAttempts: attempts
+        })
+      }
 
       console.log('Payment failure processed for user:', payment.userId)
     } catch (error: any) {

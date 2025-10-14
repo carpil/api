@@ -8,16 +8,26 @@ export enum PaymentStatus {
   Cancelled = 'cancelled'
 }
 
+export const PaymentAttemptSchema = z.object({
+  stripePaymentIntentId: z.string(),
+  status: z.string(),
+  timestamp: z.date(),
+  errorMessage: z.string().optional()
+})
+
+export type PaymentAttempt = z.infer<typeof PaymentAttemptSchema>
+
 export const PaymentSchema = z.object({
   id: z.string(),
   rideId: z.string(),
   userId: z.string(),
-  amount: z.number().min(0), // Amount in USD
-  currency: z.string().default('usd'),
+  amount: z.number().min(0),
+  currency: z.string().default('crc'),
   status: z.nativeEnum(PaymentStatus),
   stripePaymentIntentId: z.string().optional(),
   stripeClientSecret: z.string().optional(),
   description: z.string().optional(),
+  paymentAttempts: z.array(PaymentAttemptSchema).optional().default([]),
   createdAt: z.date(),
   updatedAt: z.date(),
   completedAt: z.date().optional()

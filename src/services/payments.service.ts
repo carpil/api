@@ -31,29 +31,42 @@ export class PaymentsService {
    */
   async createPaymentIntent(paymentData: CreatePaymentInput): Promise<PaymentIntentResponse & { paymentId: string }> {
     try {
-      const { amount, description, rideId } = paymentData
+      const { amount, description, rideId, userId } = paymentData
 
       if (!amount || amount <= 0) {
         throw new HttpError(400, 'Amount must be greater than 0')
       }
 
-      // Create payment record in Firebase first
-      const payment = await this.paymentsRepo.createPayment(rideId, paymentData)
+      let payment = await this.paymentsRepo.getPaymentByRideAndUser(rideId, userId)
+      
+      if (!payment) {
+        payment = await this.paymentsRepo.createPayment(rideId, paymentData)
+      }
 
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: amount,
         currency: 'crc',
         description: description ?? 'Carpil ride payment',
-        automatic_payment_methods: { enabled: true }
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          paymentId: payment.id,
+          rideId,
+          userId
+        }
       })
 
-      // Update payment with Stripe details
       await this.paymentsRepo.updatePaymentWithStripeDetails(
         rideId,
         payment.id,
         paymentIntent.id,
         paymentIntent.client_secret!
       )
+
+      await this.paymentsRepo.addPaymentAttempt(rideId, payment.id, {
+        stripePaymentIntentId: paymentIntent.id,
+        status: paymentIntent.status,
+        timestamp: new Date()
+      })
 
       return {
         clientSecret: paymentIntent.client_secret!,
