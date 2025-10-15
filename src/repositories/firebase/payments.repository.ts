@@ -1,5 +1,6 @@
 import { firestore, FieldValue } from 'config/firebase'
 import { Payment, PaymentStatus, CreatePaymentInput, PaymentAttempt } from '@models/payment.model'
+import { StripePaymentMetadata } from '../../types/stripe.types'
 
 export class PaymentsRepository {
   /**
@@ -57,8 +58,42 @@ export class PaymentsRepository {
 
   /**
    * Find a payment by Stripe PaymentIntent ID
+   * Uses metadata from PaymentIntent to do a direct document read
    */
-  async getPaymentByIntentId(paymentIntentId: string): Promise<Payment | null> {
+  async getPaymentByIntentId(paymentIntentId: string, metadata?: Partial<StripePaymentMetadata>): Promise<Payment | null> {
+    // If we have metadata (from webhook), do a direct document read (faster, no index needed)
+    if (metadata?.rideId && metadata?.paymentId) {
+      const doc = await firestore
+        .collection('rides')
+        .doc(metadata.rideId)
+        .collection('payments')
+        .doc(metadata.paymentId)
+        .get()
+      
+      if (!doc.exists) {
+        return null
+      }
+      
+      const data = doc.data()
+      if (!data) {
+        return null
+      }
+      
+      return {
+        ...data,
+        id: doc.id,
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+        completedAt: data.completedAt?.toDate(),
+        paymentAttempts: data.paymentAttempts?.map((attempt: any) => ({
+          ...attempt,
+          timestamp: attempt.timestamp?.toDate()
+        })) || []
+      } as Payment
+    }
+    
+    // Fallback: use collection group query (requires composite index)
+    // This is only used if metadata is not available (e.g., manual recovery)
     const paymentsQuery = await firestore
       .collectionGroup('payments')
       .where('stripePaymentIntentId', '==', paymentIntentId)
