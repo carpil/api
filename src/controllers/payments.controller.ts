@@ -120,4 +120,16 @@ export class PaymentsController {
       message: 'Ride payments retrieved successfully'
     })
   })
+
+  recoverPayment = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { paymentIntentId } = req.params
+
+    if (!paymentIntentId) {
+      return res.status(400).json({ error: 'Payment intent ID is required' })
+    }
+
+    const result = await this.paymentsService.recoverPayment(paymentIntentId)
+    
+    return res.json(result)
+  })
 }

@@ -25,6 +25,11 @@ const createPaymentsRouter = (paymentsController: PaymentsController) => {
     paymentsController.getPaymentStatus(req, res, next)
   )
 
+  // Recover a payment by syncing with Stripe's actual status
+  router.post('/recover/:paymentIntentId', authenticate, (req, res, next) =>
+    paymentsController.recoverPayment(req, res, next)
+  )
+
   return router
 }
 
