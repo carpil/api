@@ -30,6 +30,11 @@ const createPaymentsRouter = (paymentsController: PaymentsController) => {
     paymentsController.recoverPayment(req, res, next)
   )
 
+  // Complete a SINPE payment
+  router.post('/complete-sinpe', authenticate, (req, res, next) =>
+    paymentsController.completeSinpePayment(req, res, next)
+  )
+
   return router
 }
 

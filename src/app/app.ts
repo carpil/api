@@ -40,7 +40,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const notificationsRepo = RepositoryFactory.createNotificationsRepository()
 
   // Initialize all services
-  const paymentsService = new PaymentsService(paymentsRepo)
+  const paymentsService = new PaymentsService(paymentsRepo, ridesRepo, usersRepo)
   const ridesService = new RidesService(ridesRepo, usersRepo, chatsRepo, paymentsRepo)
   const usersService = new UsersService(usersRepo, new RatingsService(ratingsRepo, ridesRepo, usersRepo), ridesService)
   const chatsService = new ChatsService(chatsRepo, usersRepo)

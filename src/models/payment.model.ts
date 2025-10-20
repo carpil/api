@@ -8,6 +8,11 @@ export enum PaymentStatus {
   Cancelled = 'cancelled'
 }
 
+export enum PaymentMethod {
+  DebitCard = 'debit-card',
+  Sinpe = 'sinpe'
+}
+
 export const PaymentAttemptSchema = z.object({
   stripePaymentIntentId: z.string(),
   status: z.string(),
@@ -24,8 +29,10 @@ export const PaymentSchema = z.object({
   amount: z.number().min(0),
   currency: z.string().default('crc'),
   status: z.nativeEnum(PaymentStatus),
+  paymentMethod: z.nativeEnum(PaymentMethod).default(PaymentMethod.DebitCard),
   stripePaymentIntentId: z.string().optional(),
   stripeClientSecret: z.string().optional(),
+  attachmentUrl: z.string().optional(),
   description: z.string().optional(),
   paymentAttempts: z.array(PaymentAttemptSchema).optional().default([]),
   createdAt: z.date(),
