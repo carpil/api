@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { PaymentsService } from '@services/payments.service'
 import { asyncHandler } from '@utils/http'
-import { validateCreatePayment } from '../schemas/payment'
+import { validateCreatePayment, validateCompleteSinpePayment } from '../schemas/payment'
 import { AuthRequest } from '@middlewares/auth.middleware'
 import { CreatePaymentInput } from '@models/payment.model'
 
@@ -131,5 +131,37 @@ export class PaymentsController {
     const result = await this.paymentsService.recoverPayment(paymentIntentId)
     
     return res.json(result)
+  })
+
+  completeSinpePayment = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const validation = validateCompleteSinpePayment(req.body)
+    
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: 'Invalid SINPE payment data', 
+        details: validation.error.errors 
+      })
+    }
+
+    const { rideId, amount, description, attachmentUrl } = validation.data
+    const userId = req.user?.uid
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' })
+    }
+
+    const result = await this.paymentsService.completeSinpePayment(
+      userId,
+      rideId,
+      amount,
+      attachmentUrl,
+      description
+    )
+
+    return res.json({
+      success: true,
+      paymentId: result.paymentId,
+      message: 'SINPE payment completed successfully'
+    })
   })
 }

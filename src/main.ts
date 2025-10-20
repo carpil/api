@@ -15,7 +15,7 @@ const chatsRepo = RepositoryFactory.createChatsRepository()
 const paymentsRepo = RepositoryFactory.createPaymentsRepository()
 
 // Initialize all services
-const paymentsService = new PaymentsService(paymentsRepo)
+const paymentsService = new PaymentsService(paymentsRepo, ridesRepo, usersRepo)
 const ridesService = new RidesService(ridesRepo, usersRepo, chatsRepo, paymentsRepo)
 
 // Initialize webhook controller

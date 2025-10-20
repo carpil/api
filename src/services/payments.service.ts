@@ -3,14 +3,23 @@ import { env } from '../config/env'
 import { CreatePaymentInput, PaymentIntentResponse, Payment, PaymentStatus } from '../models/payment.model'
 import { HttpError } from '../utils/http'
 import { PaymentsRepository } from '../repositories/firebase/payments.repository'
+import { RidesRepository } from '../repositories/firebase/rides.repository'
+import { UsersRepository } from '../repositories/firebase/users.repository'
 import { logger } from '../config/logger'
 import { StripePaymentMetadata } from '../types/stripe.types'
+import { RideStatus } from '../models/ride.model'
 
 export class PaymentsService {
   private stripe: Stripe
   private paymentsRepo: PaymentsRepository
+  private ridesRepo: RidesRepository
+  private usersRepo: UsersRepository
 
-  constructor(paymentsRepo: PaymentsRepository) {
+  constructor(
+    paymentsRepo: PaymentsRepository,
+    ridesRepo: RidesRepository,
+    usersRepo: UsersRepository
+  ) {
     if (!env.STRIPE_SECRET_KEY) {
       throw new Error('STRIPE_SECRET_KEY is required')
     }
@@ -19,6 +28,8 @@ export class PaymentsService {
       apiVersion: '2025-09-30.clover'
     })
     this.paymentsRepo = paymentsRepo
+    this.ridesRepo = ridesRepo
+    this.usersRepo = usersRepo
   }
 
   /**
@@ -267,6 +278,125 @@ export class PaymentsService {
         paymentIntentId
       }, 'Error during payment recovery')
       throw new HttpError(500, `Payment recovery failed: ${error.message}`)
+    }
+  }
+
+  /**
+   * Complete a SINPE payment
+   * This bypasses Stripe and directly marks the payment as completed
+   */
+  async completeSinpePayment(
+    userId: string,
+    rideId: string,
+    amount: number,
+    attachmentUrl: string,
+    description?: string
+  ): Promise<{ paymentId: string }> {
+    try {
+      logger.info({ userId, rideId, amount }, 'Starting SINPE payment completion')
+
+      // 1. Check if ride exists
+      const ride = await this.ridesRepo.getById(rideId)
+      if (!ride) {
+        throw new HttpError(404, 'Ride not found')
+      }
+
+      // 2. Verify user is a passenger on the ride
+      const isPassenger = ride.passengers?.some(p => p.id === userId)
+      if (!isPassenger) {
+        throw new HttpError(403, 'User is not a passenger on this ride')
+      }
+
+      // 3. Validate attachmentUrl is a Firebase Storage URL
+      if (!attachmentUrl.includes('firebasestorage.googleapis.com')) {
+        throw new HttpError(400, 'Attachment URL must be a valid Firebase Storage URL')
+      }
+
+      // 4. Check if payment already exists for this user/ride
+      let payment = await this.paymentsRepo.getPaymentByRideAndUser(rideId, userId)
+      
+      if (payment) {
+        // If payment already exists and is completed, return error
+        if (payment.status === PaymentStatus.Succeeded) {
+          throw new HttpError(400, 'Payment for this ride has already been completed')
+        }
+        
+        // If payment exists but not completed, we could update it
+        // For now, we'll throw an error to keep it simple
+        throw new HttpError(400, 'A payment for this ride already exists')
+      }
+
+      // 5. Create payment with SINPE method
+      payment = await this.paymentsRepo.createSinpePayment(
+        rideId,
+        userId,
+        amount,
+        attachmentUrl,
+        description
+      )
+      logger.info({ paymentId: payment.id, rideId, userId }, 'SINPE payment created')
+
+      // 6. Get user and update pending payments
+      const user = await this.usersRepo.getById(userId)
+      if (!user) {
+        logger.error({ userId, paymentId: payment.id }, 'User not found for SINPE payment')
+        throw new HttpError(404, 'User not found')
+      }
+
+      // 7. Remove from pending payments
+      const updatedPendingPayment = (user.pendingPaymentRideIds || []).filter(
+        id => id !== rideId
+      )
+      await this.usersRepo.update(userId, {
+        pendingPaymentRideIds: updatedPendingPayment
+      })
+      logger.info({ userId, updatedPendingPayment }, 'Removed ride from user pending payments')
+
+      // 8. Add to pending reviews
+      const currentPendingReview = user.pendingReviewRideIds || []
+      const updatedPendingReview = [rideId, ...currentPendingReview.filter(id => id !== rideId)]
+      await this.usersRepo.update(userId, {
+        pendingReviewRideIds: updatedPendingReview
+      })
+      logger.info({ userId, updatedPendingReview }, 'Added ride to user pending reviews')
+
+      // 9. Update ride participant status
+      await this.ridesRepo.setParticipant(
+        rideId,
+        userId,
+        { active: false, pendingToReview: true }
+      )
+      logger.info({ rideId, userId }, 'Updated ride participant status')
+
+      // 10. Check if all payments are completed
+      const allPaid = await this.paymentsRepo.checkAllPaymentsPaid(rideId)
+      logger.info({ rideId, allPaid }, 'Checked if all payments are completed')
+      
+      if (allPaid) {
+        await this.ridesRepo.update(rideId, {
+          status: RideStatus.Completed,
+          updatedAt: new Date()
+        })
+        logger.info({ rideId }, 'All payments completed - ride marked as completed')
+      }
+
+      logger.info({ paymentId: payment.id, rideId }, 'SINPE payment completed successfully')
+
+      return { paymentId: payment.id }
+    } catch (error: any) {
+      logger.error({ 
+        error: error.message, 
+        stack: error.stack,
+        userId,
+        rideId
+      }, 'Error during SINPE payment completion')
+      
+      // Re-throw HttpErrors as-is
+      if (error instanceof HttpError) {
+        throw error
+      }
+      
+      throw new HttpError(500, `SINPE payment completion failed: ${error.message}`)
     }
   }
 }

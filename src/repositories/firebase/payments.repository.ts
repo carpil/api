@@ -1,5 +1,5 @@
 import { firestore, FieldValue } from 'config/firebase'
-import { Payment, PaymentStatus, CreatePaymentInput, PaymentAttempt } from '@models/payment.model'
+import { Payment, PaymentStatus, PaymentMethod, CreatePaymentInput, PaymentAttempt } from '@models/payment.model'
 import { StripePaymentMetadata } from '../../types/stripe.types'
 
 export class PaymentsRepository {
@@ -20,10 +20,48 @@ export class PaymentsRepository {
       amount: paymentData.amount,
       currency: 'crc',
       status: PaymentStatus.Pending,
+      paymentMethod: PaymentMethod.DebitCard,
       description: paymentData.description,
       paymentAttempts: [],
       createdAt: new Date(),
       updatedAt: new Date()
+    }
+    
+    await paymentRef.set(payment)
+    return payment
+  }
+
+  /**
+   * Create a SINPE payment record with completed status
+   */
+  async createSinpePayment(
+    rideId: string, 
+    userId: string, 
+    amount: number, 
+    attachmentUrl: string,
+    description?: string
+  ): Promise<Payment> {
+    const paymentRef = firestore
+      .collection('rides')
+      .doc(rideId)
+      .collection('payments')
+      .doc()
+    
+    const now = new Date()
+    const payment: Payment = {
+      id: paymentRef.id,
+      rideId,
+      userId,
+      amount,
+      currency: 'crc',
+      status: PaymentStatus.Succeeded,
+      paymentMethod: PaymentMethod.Sinpe,
+      attachmentUrl,
+      description,
+      paymentAttempts: [],
+      createdAt: now,
+      updatedAt: now,
+      completedAt: now
     }
     
     await paymentRef.set(payment)
