@@ -34,6 +34,11 @@ export class UsersController {
     const result = await this.usersService.bootstrap(req.user?.uid ?? '')
     res.json(result)
   })
+
+  getUserInfo = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userInfo = await this.usersService.getUserInfo(req.params.userId)
+    res.json(userInfo)
+  })
 }
 
 

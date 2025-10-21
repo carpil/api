@@ -86,6 +86,34 @@ export class RidesRepository implements IRidesRepository {
 
     return ratingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
   }
+
+  async countCompletedRidesByUser(userId: string): Promise<{ asDriver: number, asPassenger: number }> {
+    // Count rides completed as driver
+    const driverRidesSnapshot = await firestore
+      .collection('rides')
+      .where('driver.id', '==', userId)
+      .where('status', '==', RideStatus.Completed)
+      .get()
+    
+    const asDriver = driverRidesSnapshot.size
+
+    // Count rides completed as passenger
+    const allCompletedRidesSnapshot = await firestore
+      .collection('rides')
+      .where('status', '==', RideStatus.Completed)
+      .get()
+    
+    let asPassenger = 0
+    allCompletedRidesSnapshot.docs.forEach(doc => {
+      const ride = doc.data() as Ride
+      const passengers = ride.passengers || []
+      if (passengers.some(p => p.id === userId)) {
+        asPassenger++
+      }
+    })
+
+    return { asDriver, asPassenger }
+  }
 }
 
 
