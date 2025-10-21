@@ -6,7 +6,13 @@ export class UsersRepository implements IUsersRepository {
   async getById(userId: string): Promise<User | null> {
     const userDocument = await firestore.collection('users').doc(userId).get()
     if (!userDocument.exists) return null
-    return userDocument.data() as User
+    
+    const userData = userDocument.data() as any
+    return {
+      ...userData,
+      createdAt: userData?.createdAt?.toDate() ?? null,
+      updatedAt: userData?.updatedAt?.toDate() ?? null
+    } as User
   }
 
   async update(userId: string, userUpdates: Partial<User>): Promise<void> {
