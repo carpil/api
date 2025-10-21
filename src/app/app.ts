@@ -42,7 +42,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   // Initialize all services
   const paymentsService = new PaymentsService(paymentsRepo, ridesRepo, usersRepo)
   const ridesService = new RidesService(ridesRepo, usersRepo, chatsRepo, paymentsRepo)
-  const usersService = new UsersService(usersRepo, new RatingsService(ratingsRepo, ridesRepo, usersRepo), ridesService)
+  const usersService = new UsersService(usersRepo, new RatingsService(ratingsRepo, ridesRepo, usersRepo), ridesService, ridesRepo)
   const chatsService = new ChatsService(chatsRepo, usersRepo)
   const ratingsService = new RatingsService(ratingsRepo, ridesRepo, usersRepo)
   const notificationsService = new NotificationsService(notificationsRepo)

@@ -1,4 +1,5 @@
 import { UsersRepository } from '../repositories/firebase/users.repository'
+import { RidesRepository } from '../repositories/firebase/rides.repository'
 import { HttpError } from '../utils/http'
 import { User } from '@models/user'
 import { RatingsService } from './ratings.service'
@@ -10,7 +11,8 @@ export class UsersService {
   constructor(
     private readonly usersRepo: UsersRepository,
     private readonly ratingsService: RatingsService,
-    private readonly ridesService: RidesService
+    private readonly ridesService: RidesService,
+    private readonly ridesRepo: RidesRepository
   ) {}
 
   async signup(currentUser: { uid: string, email?: string }, input: User) {
@@ -154,6 +156,23 @@ export class UsersService {
       pendingReviews,
       pendingPayment,
       isDriver
+    }
+  }
+
+  async getUserInfo(userId: string) {
+    const user = await this.usersRepo.getById(userId)
+    if (!user) throw new HttpError(404, 'User not found')
+
+    const rideCounts = await this.ridesRepo.countCompletedRidesByUser(userId)
+
+    return {
+      userId: user.id,
+      name: user.name,
+      profilePicture: user.profilePicture,
+      averageRating: user.averageRating ?? 0,
+      ridesCompletedAsDriver: rideCounts.asDriver,
+      ridesCompletedAsPassenger: rideCounts.asPassenger,
+      joinedAt: user.createdAt
     }
   }
 }
