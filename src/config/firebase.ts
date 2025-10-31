@@ -1,5 +1,6 @@
 import { cert } from 'firebase-admin/app'
 import admin from 'firebase-admin'
+import { FieldValue as FirestoreFieldValue } from 'firebase-admin/firestore'
 
 if (admin.apps.length === 0) {
   try {
@@ -19,6 +20,15 @@ if (admin.apps.length === 0) {
   }
 }
 
+
+const DATABASE_ID = process.env.FIREBASE_DATABASE_ID || '(default)'
+
+// Initialize firestore with specific database
+const firestoreInstance = admin.firestore()
+if (DATABASE_ID !== '(default)') {
+  firestoreInstance.settings({ databaseId: DATABASE_ID })
+}
+
 export const auth = admin.auth()
-export const firestore = admin.firestore()
-export const FieldValue = admin.firestore.FieldValue
+export const firestore = firestoreInstance
+export const FieldValue = FirestoreFieldValue
