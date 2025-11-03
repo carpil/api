@@ -32,6 +32,30 @@ export class UsersService {
     return toSave
   }
 
+  async signupEmail(currentUser: { uid: string, email?: string }, input: { firstName: string, lastName: string, phoneNumber: string, email: string }) {
+    if (!currentUser?.uid) throw new HttpError(401, 'Unauthorized')
+    if (currentUser.email && input.email !== currentUser.email) throw new HttpError(401, 'Unauthorized')
+
+    const exists = await this.usersRepo.exists(currentUser.uid)
+    if (exists) throw new HttpError(400, 'User already exists')
+
+    const formattedPhoneNumber = `+506${input.phoneNumber}`
+
+    const toSave: User = {
+      id: currentUser.uid,
+      name: `${input.firstName} ${input.lastName}`,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      phoneNumber: formattedPhoneNumber,
+      email: input.email,
+      profilePicture: '',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+    await this.usersRepo.create(currentUser.uid, toSave)
+    return toSave
+  }
+
   async login(currentUser: { uid: string, email?: string }, input: User) {
     if (!currentUser?.uid || input.id !== currentUser.uid) throw new HttpError(401, 'Unauthorized')
     if (currentUser.email && input.email && input.email !== currentUser.email) throw new HttpError(401, 'Unauthorized')
