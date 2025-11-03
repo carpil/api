@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { asyncHandler } from '../utils/http'
 import { UsersService } from '../services/users.service'
-import { userSchema } from '../schemas/user'
+import { userSchema, emailSignupSchema } from '../schemas/user'
 import { AuthRequest } from '../middlewares/auth.middleware'
 
 export class UsersController {
@@ -15,6 +15,12 @@ export class UsersController {
   signup = asyncHandler(async (req: AuthRequest, res: Response) => {
     const body = userSchema.parse(req.body)
     const user = await this.usersService.signup(req.user!, body as any)
+    res.json({ message: 'User created successfully', user })
+  })
+
+  signupEmail = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const body = emailSignupSchema.parse(req.body)
+    const user = await this.usersService.signupEmail(req.user!, body)
     res.json({ message: 'User created successfully', user })
   })
 
