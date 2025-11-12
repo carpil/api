@@ -4,13 +4,12 @@ import { ChatsRepository } from '../repositories/firebase/chats.repository'
 import { PaymentsRepository } from '../repositories/firebase/payments.repository'
 import { CreateRideInput, Ride, RideStatus } from '../models/ride.model'
 import { HttpError } from '../utils/http'
-import { Expo } from 'expo-server-sdk'
+import { sendPushNotifications } from 'config/push-notifications'
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000
 const MAX_RIDES_PER_HOUR = 5
 const MAX_ACTIVE_RIDES = 2
 
-const expo = new Expo()
 const userRateLimitStore = new Map<string, { count: number, timestamp: number }>()
 
 export class RidesService {
@@ -89,6 +88,34 @@ export class RidesService {
 
     await this.ridesRepo.addPassenger(rideId, passengerInfo)
     if (ride.chatId) await this.chatsRepo.addParticipant(ride.chatId, passengerId)
+
+    // Send push notification to driver
+    const driver = await this.usersRepo.getById(ride.driver.id)
+    if (driver) {
+      await sendPushNotifications({
+        pushTokens: driver?.pushToken || [],
+        title: 'Nuevo pasajero se ha unido al viaje',
+        body: `${passenger.name} se ha unido al viaje.`,
+        data: { rideId, passengerId, url: `carpil://ride/${rideId}?source=push` }
+      })
+    }
+    // Send push notification to rest passengers (excluding driver)
+    const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+    const deviceTokens: string[] = []
+    for (const passenger of passengers) {
+      if (passenger.id !== passengerId) {
+        const passengerUser = await this.usersRepo.getById(passenger.id)
+        deviceTokens.push(...passengerUser?.pushToken || [])
+      }
+    }
+    if (deviceTokens.length > 0) {
+      await sendPushNotifications({
+        pushTokens: deviceTokens,
+        title: 'Nuevo pasajero se ha unido al viaje',
+        body: `${passenger.name} se ha unido al viaje.`,
+        data: { rideId, passengerId, url: `carpil://ride/${rideId}?source=push` }
+      })
+    }
   }
 
   async startRide(rideId: string, driverId: string) {
@@ -101,7 +128,7 @@ export class RidesService {
     await this.ridesRepo.setParticipant(rideId, driverId, { active: true, pendingToReview: false })
 
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
-    const pushNotifications: any[] = []
+    const deviceTokens: string[] = []
 
     for (const passenger of passengers) {
       await this.usersRepo.update(passenger.id, { currentRideId: rideId })
@@ -109,22 +136,19 @@ export class RidesService {
 
       const passengerUser = await this.usersRepo.getById(passenger.id)
       const pushTokens = passengerUser?.pushToken || []
-      for (const pushToken of pushTokens) {
-        if (Expo.isExpoPushToken(pushToken)) {
-          pushNotifications.push({
-            to: pushToken,
-            sound: 'default',
-            title: 'Tu viaje ha iniciado',
-            body: 'El conductor ha iniciado el viaje.',
-            data: { rideId, driverId }
-          })
-        }
-      }
+      deviceTokens.push(...pushTokens)
     }
 
-    if (pushNotifications.length > 0) {
-      await expo.sendPushNotificationsAsync(pushNotifications)
+    if (deviceTokens.length > 0) {
+      await sendPushNotifications({
+        pushTokens: deviceTokens,
+        title: 'Tu viaje ha iniciado',
+        body: 'El conductor ha iniciado el viaje.',
+        data: { rideId, driverId, url: `carpil://ride-navigation/${rideId}?source=push` }
+      })
     }
+
+    return { message: 'Ride started successfully' }
   }
 
   async completeRide(rideId: string, driverId: string) {
@@ -148,7 +172,7 @@ export class RidesService {
     }
 
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
-    const pushNotifications: any[] = []
+    const deviceTokens: string[] = []
 
     // Create payment records for each passenger
     for (const passenger of passengers) {
@@ -172,22 +196,19 @@ export class RidesService {
       await this.ridesRepo.setParticipant(rideId, passenger.id, { active: false, pendingToReview: false })
 
       const pushTokens = passengerUser?.pushToken || []
-      for (const pushToken of pushTokens) {
-        if (Expo.isExpoPushToken(pushToken)) {
-          pushNotifications.push({
-            to: pushToken,
-            sound: 'default',
-            title: 'Viaje completado',
-            body: 'El viaje ha finalizado. Por favor procede al pago.',
-            data: { rideId, driverId }
-          })
-        }
-      }
+      deviceTokens.push(...pushTokens)
     }
 
-    if (pushNotifications.length > 0) {
-      await expo.sendPushNotificationsAsync(pushNotifications)
+    if (deviceTokens.length > 0) {
+      await sendPushNotifications({
+        pushTokens: deviceTokens,
+        title: 'Tu viaje ha completado',
+        body: 'El conductor ha completado el viaje.',
+        data: { rideId, driverId, url: `carpil://checkout/${rideId}?source=push` }
+      })
     }
+
+    return { message: 'Ride completed successfully' }
   }
 
   private async addPendingReviewRide(userId: string, rideId: string) {
