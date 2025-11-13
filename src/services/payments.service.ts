@@ -1,6 +1,6 @@
 import Stripe from 'stripe'
 import { env } from '../config/env'
-import { CreatePaymentInput, PaymentIntentResponse, Payment, PaymentStatus } from '../models/payment.model'
+import { CreatePaymentInput, PaymentIntentResponse, Payment, PaymentStatus, PaymentMethod } from '../models/payment.model'
 import { HttpError } from '../utils/http'
 import { PaymentsRepository } from '../repositories/firebase/payments.repository'
 import { RidesRepository } from '../repositories/firebase/rides.repository'
@@ -56,6 +56,10 @@ export class PaymentsService {
         payment = await this.paymentsRepo.createPayment(rideId, paymentData)
       }
 
+      if (payment.paymentMethod === PaymentMethod.Unspecified) {
+        await this.paymentsRepo.updatePaymentToDebitCard(rideId, payment.id)
+      }
+
       // Create metadata object with proper typing
       const metadata: StripePaymentMetadata = {
         paymentId: payment.id,
@@ -79,6 +83,7 @@ export class PaymentsService {
       )
 
       await this.paymentsRepo.addPaymentAttempt(rideId, payment.id, {
+        method: 'debit-card',
         stripePaymentIntentId: paymentIntent.id,
         status: paymentIntent.status,
         timestamp: new Date()
@@ -316,25 +321,47 @@ export class PaymentsService {
       let payment = await this.paymentsRepo.getPaymentByRideAndUser(rideId, userId)
       
       if (payment) {
-        // If payment already exists and is completed, return error
         if (payment.status === PaymentStatus.Succeeded) {
           throw new HttpError(400, 'Payment for this ride has already been completed')
         }
         
-        // If payment exists but not completed, we could update it
-        // For now, we'll throw an error to keep it simple
-        throw new HttpError(400, 'A payment for this ride already exists')
+        if (payment.stripePaymentIntentId) {
+          try {
+            await this.stripe.paymentIntents.cancel(payment.stripePaymentIntentId)
+            logger.info({ stripePaymentIntentId: payment.stripePaymentIntentId }, 'Cancelled Stripe PaymentIntent')
+          } catch (error: any) {
+            logger.warn({ error: error.message, stripePaymentIntentId: payment.stripePaymentIntentId }, 'Failed to cancel Stripe PaymentIntent')
+          }
+        }
+        
+        await this.paymentsRepo.updatePaymentToSinpe(rideId, payment.id, attachmentUrl)
+        
+        await this.paymentsRepo.addPaymentAttempt(rideId, payment.id, {
+          method: 'sinpe',
+          attachmentUrl,
+          status: 'succeeded',
+          timestamp: new Date()
+        })
+        
+        logger.info({ paymentId: payment.id, rideId, userId }, 'Payment updated to SINPE')
+      } else {
+        payment = await this.paymentsRepo.createSinpePayment(
+          rideId,
+          userId,
+          amount,
+          attachmentUrl,
+          description
+        )
+        
+        await this.paymentsRepo.addPaymentAttempt(rideId, payment.id, {
+          method: 'sinpe',
+          attachmentUrl,
+          status: 'succeeded',
+          timestamp: new Date()
+        })
+        
+        logger.info({ paymentId: payment.id, rideId, userId }, 'SINPE payment created')
       }
-
-      // 5. Create payment with SINPE method
-      payment = await this.paymentsRepo.createSinpePayment(
-        rideId,
-        userId,
-        amount,
-        attachmentUrl,
-        description
-      )
-      logger.info({ paymentId: payment.id, rideId, userId }, 'SINPE payment created')
 
       // 6. Get user and update pending payments
       const user = await this.usersRepo.getById(userId)
