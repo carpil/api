@@ -26,13 +26,46 @@ export class ChatsService {
       }
     }
 
+    // Fetch rides for chats that have rideId
+    const ridesMap = new Map<string, any>()
+    for (const chat of chats) {
+      if (chat.rideId && !ridesMap.has(chat.rideId)) {
+        const ride = await this.ridesRepo.getById(chat.rideId)
+        if (ride) ridesMap.set(chat.rideId, ride)
+      }
+    }
+
     return chats.map(chat => {
-      const members = chat.participants.map((uid: string) => usersMap.get(uid)).filter(Boolean)
-      const owner = members.find((m: any) => m.id === chat.owner)
+      // Map to UserInfo format (simplified)
+      const members = chat.participants
+        .map((uid: string) => {
+          const user = usersMap.get(uid)
+          return user ? { id: user.id, name: user.name, profilePicture: user.profilePicture } : null
+        })
+        .filter(Boolean)
+      
+      const ownerUser = usersMap.get(chat.owner)
+      const owner = ownerUser 
+        ? { id: ownerUser.id, name: ownerUser.name, profilePicture: ownerUser.profilePicture }
+        : undefined
+      
       const lastMessage = chat.lastMessage
         ? { ...chat.lastMessage, content: decryptMessage(chat.lastMessage.content) }
         : undefined
-      return { ...chat, participants: members, owner, lastMessage }
+
+      // Include ride information if available
+      const rideInfo = chat.rideId && ridesMap.has(chat.rideId)
+        ? (() => {
+            const ride = ridesMap.get(chat.rideId)
+            return {
+              origin: ride.origin,
+              destination: ride.destination,
+              status: ride.status
+            }
+          })()
+        : undefined
+
+      return { ...chat, participants: members, owner, lastMessage, ride: rideInfo }
     })
   }
 
@@ -50,12 +83,36 @@ export class ChatsService {
       if (u) members.push(u)
     }
 
+    // Map to UserInfo format (simplified)
+    const participantsInfo = members.map(user => ({
+      id: user.id,
+      name: user.name,
+      profilePicture: user.profilePicture
+    }))
+
+    const ownerUser = members.find(m => m.id === chat.owner)
+    const owner = ownerUser
+      ? { id: ownerUser.id, name: ownerUser.name, profilePicture: ownerUser.profilePicture }
+      : undefined
+
     const lastMessage = chat.lastMessage
       ? { ...chat.lastMessage, content: decryptMessage(chat.lastMessage.content) }
       : undefined
 
-    const owner = members.find(m => m.id === chat.owner)
-    return { ...chat, participants: members, owner, lastMessage }
+    // Fetch ride information if available
+    let rideInfo = undefined
+    if (chat.rideId) {
+      const ride = await this.ridesRepo.getById(chat.rideId)
+      if (ride) {
+        rideInfo = {
+          origin: ride.origin,
+          destination: ride.destination,
+          status: ride.status
+        }
+      }
+    }
+
+    return { ...chat, participants: participantsInfo, owner, lastMessage, ride: rideInfo }
   }
 
   async sendMessage(chatId: string, currentUserId: string, content: string) {
