@@ -9,12 +9,14 @@ import { UsersService } from '../services/users.service'
 import { ChatsService } from '../services/chats.service'
 import { RatingsService } from '../services/ratings.service'
 import { NotificationsService } from '../services/notifications.service'
+import { RideRequestsService } from '../services/ride-requests.service'
 import { PaymentsController } from '../controllers/payments.controller'
 import { RidesController } from '../controllers/rides.controller'
 import { UsersController } from '../controllers/users.controller'
 import { ChatsController } from '../controllers/chats.controller'
 import { RatingsController } from '../controllers/ratings.controller'
 import { NotificationsController } from '../controllers/notifications.controller'
+import { RideRequestsController } from '../controllers/ride-requests.controller'
 import createRoutes from '../routes'
 
 export const createApp = (webhooksController: WebhooksController) => {
@@ -38,6 +40,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const paymentsRepo = RepositoryFactory.createPaymentsRepository()
   const ratingsRepo = RepositoryFactory.createRatingsRepository()
   const notificationsRepo = RepositoryFactory.createNotificationsRepository()
+  const rideRequestsRepo = RepositoryFactory.createRideRequestsRepository()
 
   // Initialize all services
   const paymentsService = new PaymentsService(paymentsRepo, ridesRepo, usersRepo)
@@ -46,6 +49,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const chatsService = new ChatsService(chatsRepo, usersRepo, ridesRepo)
   const ratingsService = new RatingsService(ratingsRepo, ridesRepo, usersRepo)
   const notificationsService = new NotificationsService(notificationsRepo)
+  const rideRequestsService = new RideRequestsService(rideRequestsRepo, usersRepo)
 
   // Initialize all controllers
   const paymentsController = new PaymentsController(paymentsService)
@@ -54,6 +58,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const chatsController = new ChatsController(chatsService)
   const ratingsController = new RatingsController(ratingsService)
   const notificationsController = new NotificationsController(notificationsService)
+  const rideRequestsController = new RideRequestsController(rideRequestsService)
 
   // Create routes with all controllers
   const routes = createRoutes({
@@ -62,7 +67,8 @@ export const createApp = (webhooksController: WebhooksController) => {
     usersController,
     chatsController,
     ratingsController,
-    notificationsController
+    notificationsController,
+    rideRequestsController
   })
 
   app.use('/', routes)
