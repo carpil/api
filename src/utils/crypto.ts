@@ -1,6 +1,6 @@
 import CryptoJS from 'crypto-js'
 
-const SECRET = process.env.CHAT_SECRET || 'default-secret'
+const SECRET = process.env.CHAT_SECRET_KEY ?? ''
 
 export function encryptMessage(plain: string): string {
   return CryptoJS.AES.encrypt(plain, SECRET).toString()
