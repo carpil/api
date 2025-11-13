@@ -9,12 +9,15 @@ export enum PaymentStatus {
 }
 
 export enum PaymentMethod {
+  Unspecified = 'unspecified',
   DebitCard = 'debit-card',
   Sinpe = 'sinpe'
 }
 
 export const PaymentAttemptSchema = z.object({
-  stripePaymentIntentId: z.string(),
+  method: z.enum(['debit-card', 'sinpe']),
+  stripePaymentIntentId: z.string().optional(),
+  attachmentUrl: z.string().optional(),
   status: z.string(),
   timestamp: z.date(),
   errorMessage: z.string().optional()

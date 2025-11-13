@@ -20,7 +20,7 @@ export class PaymentsRepository {
       amount: paymentData.amount,
       currency: 'crc',
       status: PaymentStatus.Pending,
-      paymentMethod: PaymentMethod.DebitCard,
+      paymentMethod: PaymentMethod.Unspecified,
       description: paymentData.description,
       paymentAttempts: [],
       createdAt: new Date(),
@@ -265,6 +265,40 @@ export class PaymentsRepository {
       .update({
         ...data,
         updatedAt: new Date()
+      })
+  }
+
+  async updatePaymentToDebitCard(rideId: string, paymentId: string): Promise<void> {
+    await firestore
+      .collection('rides')
+      .doc(rideId)
+      .collection('payments')
+      .doc(paymentId)
+      .update({
+        paymentMethod: PaymentMethod.DebitCard,
+        updatedAt: new Date()
+      })
+  }
+
+  async updatePaymentToSinpe(
+    rideId: string, 
+    paymentId: string, 
+    attachmentUrl: string
+  ): Promise<void> {
+    const now = new Date()
+    await firestore
+      .collection('rides')
+      .doc(rideId)
+      .collection('payments')
+      .doc(paymentId)
+      .update({
+        paymentMethod: PaymentMethod.Sinpe,
+        attachmentUrl,
+        status: PaymentStatus.Succeeded,
+        stripePaymentIntentId: FieldValue.delete(),
+        stripeClientSecret: FieldValue.delete(),
+        completedAt: now,
+        updatedAt: now
       })
   }
 }
