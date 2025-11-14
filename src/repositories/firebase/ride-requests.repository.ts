@@ -19,24 +19,24 @@ export class RideRequestsRepository implements IRideRequestsRepository {
   }
 
   async listAll(): Promise<RideRequest[]> {
-    const rideRequestsSnapshot = await firestore
-      .collection('ride-requests')
-      .where('status', '==', RideRequestStatus.Active)
-      .where('deletedAt', '==', null)
-      .orderBy('createdAt', 'desc')
-      .get()
-    
-    return rideRequestsSnapshot.docs.map(rideRequestDocument => {
-      const rideRequestData = rideRequestDocument.data() as any
-      return {
-        ...rideRequestData,
-        id: rideRequestDocument.id,
-        departureDate: rideRequestData?.departureDate?.toDate() ?? null,
-        deletedAt: rideRequestData?.deletedAt?.toDate() ?? null,
-        createdAt: rideRequestData?.createdAt?.toDate() ?? null,
-        updatedAt: rideRequestData?.updatedAt?.toDate() ?? null
-      } as RideRequest
-    })
+    const rideRequestsSnapshot = await firestore.collection('ride-requests').get()
+    return rideRequestsSnapshot.docs
+      .map(rideRequestDocument => {
+        const rideRequestData = rideRequestDocument.data() as any
+        return {
+          ...rideRequestData,
+          id: rideRequestDocument.id,
+          departureDate: rideRequestData?.departureDate?.toDate() ?? null,
+          deletedAt: rideRequestData?.deletedAt?.toDate() ?? null,
+          createdAt: rideRequestData?.createdAt?.toDate() ?? null,
+          updatedAt: rideRequestData?.updatedAt?.toDate() ?? null
+        } as RideRequest
+      })
+      .filter(rideRequest => 
+        rideRequest.status === RideRequestStatus.Active && 
+        rideRequest.deletedAt === null
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }
 
   async create(newRideRequest: Omit<RideRequest, 'id'>): Promise<RideRequest> {
