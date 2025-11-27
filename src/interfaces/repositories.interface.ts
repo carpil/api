@@ -2,6 +2,7 @@ import { User } from '@models/user'
 import { Ride } from '../models/ride.model'
 import { Chat, Message } from '../models/chat.model'
 import { Rating } from '../models/rating.model'
+import { RideRequest } from '../models/ride-request'
 
 // Base repository interface
 export interface IBaseRepository<T> {
@@ -54,4 +55,12 @@ export interface INotificationsRepository {
   addToken(userId: string, token: string): Promise<void>
   removeToken(userId: string, token: string): Promise<void>
   getTokens(userId: string): Promise<string[]>
+}
+
+// Ride Request repository interface
+export interface IRideRequestsRepository {
+  getById(id: string): Promise<RideRequest | null>
+  listAll(): Promise<RideRequest[]>
+  create(rideRequest: Omit<RideRequest, 'id'>): Promise<RideRequest>
+  update(id: string, partial: Partial<RideRequest>): Promise<void>
 }

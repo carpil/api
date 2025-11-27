@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { User } from '@models/user'
+import { UserInfo, Location, RideStatus } from '@models/ride.model'
 
 export const MessageSchema = z.object({
   id: z.string(),
@@ -29,9 +29,14 @@ export const ChatSchema = z.object({
 export type Chat = z.infer<typeof ChatSchema>
 
 export type ChatResponse = Omit<Chat, 'participants' | 'owner'> & {
-  participants: User[]
-  owner: User
+  participants: UserInfo[]
+  owner: UserInfo
   lastMessage?: Message & { content: string } // decrypted content for response
+  ride?: {
+    origin: Location
+    destination: Location
+    status: RideStatus
+  }
 }
 
 

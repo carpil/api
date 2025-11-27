@@ -2,14 +2,14 @@ import { ChatsRepository } from '../repositories/firebase/chats.repository'
 import { UsersRepository } from '../repositories/firebase/users.repository'
 import { HttpError } from '../utils/http'
 import { encryptMessage, decryptMessage } from '../utils/crypto'
-import { Expo } from 'expo-server-sdk'
-
-const expo = new Expo()
+import { sendPushNotifications } from 'config/push-notifications'
+import { RidesRepository } from '@repositories/firebase/rides.repository'
 
 export class ChatsService {
   constructor(
     private readonly chatsRepo: ChatsRepository,
-    private readonly usersRepo: UsersRepository
+    private readonly usersRepo: UsersRepository,
+    private readonly ridesRepo: RidesRepository
   ) {}
 
   async listChats(currentUserId: string) {
@@ -26,13 +26,46 @@ export class ChatsService {
       }
     }
 
+    // Fetch rides for chats that have rideId
+    const ridesMap = new Map<string, any>()
+    for (const chat of chats) {
+      if (chat.rideId && !ridesMap.has(chat.rideId)) {
+        const ride = await this.ridesRepo.getById(chat.rideId)
+        if (ride) ridesMap.set(chat.rideId, ride)
+      }
+    }
+
     return chats.map(chat => {
-      const members = chat.participants.map((uid: string) => usersMap.get(uid)).filter(Boolean)
-      const owner = members.find((m: any) => m.id === chat.owner)
+      // Map to UserInfo format (simplified)
+      const members = chat.participants
+        .map((uid: string) => {
+          const user = usersMap.get(uid)
+          return user ? { id: user.id, name: user.name, profilePicture: user.profilePicture } : null
+        })
+        .filter(Boolean)
+      
+      const ownerUser = usersMap.get(chat.owner)
+      const owner = ownerUser 
+        ? { id: ownerUser.id, name: ownerUser.name, profilePicture: ownerUser.profilePicture }
+        : undefined
+      
       const lastMessage = chat.lastMessage
         ? { ...chat.lastMessage, content: decryptMessage(chat.lastMessage.content) }
         : undefined
-      return { ...chat, participants: members, owner, lastMessage }
+
+      // Include ride information if available
+      const rideInfo = chat.rideId && ridesMap.has(chat.rideId)
+        ? (() => {
+            const ride = ridesMap.get(chat.rideId)
+            return {
+              origin: ride.origin,
+              destination: ride.destination,
+              status: ride.status
+            }
+          })()
+        : undefined
+
+      return { ...chat, participants: members, owner, lastMessage, ride: rideInfo }
     })
   }
 
@@ -50,17 +83,42 @@ export class ChatsService {
       if (u) members.push(u)
     }
 
+    // Map to UserInfo format (simplified)
+    const participantsInfo = members.map(user => ({
+      id: user.id,
+      name: user.name,
+      profilePicture: user.profilePicture
+    }))
+
+    const ownerUser = members.find(m => m.id === chat.owner)
+    const owner = ownerUser
+      ? { id: ownerUser.id, name: ownerUser.name, profilePicture: ownerUser.profilePicture }
+      : undefined
+
     const lastMessage = chat.lastMessage
       ? { ...chat.lastMessage, content: decryptMessage(chat.lastMessage.content) }
       : undefined
 
-    const owner = members.find(m => m.id === chat.owner)
-    return { ...chat, participants: members, owner, lastMessage }
+    // Fetch ride information if available
+    let rideInfo = undefined
+    if (chat.rideId) {
+      const ride = await this.ridesRepo.getById(chat.rideId)
+      if (ride) {
+        rideInfo = {
+          origin: ride.origin,
+          destination: ride.destination,
+          status: ride.status
+        }
+      }
+    }
+
+    return { ...chat, participants: participantsInfo, owner, lastMessage, ride: rideInfo }
   }
 
   async sendMessage(chatId: string, currentUserId: string, content: string) {
     const chat = await this.chatsRepo.getById(chatId)
     if (!chat) throw new HttpError(404, 'Chat not found')
+    if (chat.rideId == null) throw new HttpError(400, 'Chat is not associated with a ride')
     if (!chat.participants.includes(currentUserId)) throw new HttpError(403, 'You are not a participant of this chat')
 
     const now = new Date()
@@ -76,25 +134,26 @@ export class ChatsService {
     await this.chatsRepo.updateLastMessage(chatId, message as any)
 
     const others = chat.participants.filter((p: string) => p !== currentUserId)
-    const pushMessages: any[] = []
+    const deviceTokens: string[] = []
     for (const uid of others) {
       const u = await this.usersRepo.getById(uid)
       const tokens = u?.pushToken || []
-      for (const token of tokens) {
-        if (Expo.isExpoPushToken(token)) {
-          pushMessages.push({
-            to: token,
-            sound: 'default',
-            title: 'Nuevo mensaje',
-            body: content.slice(0, 80),
-            data: { chatId, senderId: currentUserId }
-          })
-        }
-      }
+      deviceTokens.push(...tokens)
     }
 
-    if (pushMessages.length > 0) {
-      await expo.sendPushNotificationsAsync(pushMessages)
+    const currentRide = await this.ridesRepo.getById(chat.rideId)
+    const title = `${currentRide?.origin.name.primary} ➡️ ${currentRide?.destination.name.primary}`
+    if (deviceTokens.length > 0) {
+      await sendPushNotifications({
+        pushTokens: deviceTokens,
+        title: `${title}`,
+        body: `${currentUserId} : ${content.slice(0, 80)}`,
+        data: { 
+          chatId, 
+          senderId: currentUserId,
+          url: `carpil://chats/messages/${chatId}?source=push`
+        }
+      })
     }
   }
 }
