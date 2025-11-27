@@ -24,17 +24,25 @@ export class RidesRepository implements IRidesRepository {
 
   async listAllDrivers(): Promise<Ride[]> {
     const ridesSnapshot = await firestore.collection('rides').get()
-    return ridesSnapshot.docs.map(rideDocument => {
-      const rideData = rideDocument.data() as any
-      return {
-        ...(rideData as Ride),
-        id: rideDocument.id,
-        departureDate: rideData?.departureDate?.toDate() ?? null,
-        deletedAt: rideData?.deletedAt?.toDate() ?? null,
-        createdAt: rideData?.createdAt?.toDate() ?? null,
-        updatedAt: rideData?.updatedAt?.toDate() ?? null
-      }
-    })
+    const now = new Date()
+    return ridesSnapshot.docs
+      .map(rideDocument => {
+        const rideData = rideDocument.data() as any
+        return {
+          ...(rideData as Ride),
+          id: rideDocument.id,
+          departureDate: rideData?.departureDate?.toDate() ?? null,
+          deletedAt: rideData?.deletedAt?.toDate() ?? null,
+          createdAt: rideData?.createdAt?.toDate() ?? null,
+          updatedAt: rideData?.updatedAt?.toDate() ?? null
+        }
+      })
+      .filter(ride => {
+        if (ride.deletedAt !== null) return false
+        if (ride.status === RideStatus.Completed) return false
+        if (ride.departureDate && ride.departureDate < now) return false
+        return true
+      })
   }
 
   async countActiveByDriver(driverId: string): Promise<number> {

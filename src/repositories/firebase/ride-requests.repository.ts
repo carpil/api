@@ -20,6 +20,7 @@ export class RideRequestsRepository implements IRideRequestsRepository {
 
   async listAll(): Promise<RideRequest[]> {
     const rideRequestsSnapshot = await firestore.collection('ride-requests').get()
+    const now = new Date()
     return rideRequestsSnapshot.docs
       .map(rideRequestDocument => {
         const rideRequestData = rideRequestDocument.data() as any
@@ -32,10 +33,12 @@ export class RideRequestsRepository implements IRideRequestsRepository {
           updatedAt: rideRequestData?.updatedAt?.toDate() ?? null
         } as RideRequest
       })
-      .filter(rideRequest => 
-        rideRequest.status === RideRequestStatus.Active && 
-        rideRequest.deletedAt === null
-      )
+      .filter(rideRequest => {
+        if (rideRequest.status !== RideRequestStatus.Active) return false
+        if (rideRequest.deletedAt !== null) return false
+        if (rideRequest.departureDate && rideRequest.departureDate < now) return false
+        return true
+      })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
   }
 
