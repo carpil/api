@@ -151,7 +151,7 @@ export class ChatsService {
         data: { 
           chatId, 
           senderId: currentUserId,
-          url: `carpil://chats/messages/${chatId}?source=push`
+          url: `carpil://chats/${chatId}?source=push`
         }
       })
     }
