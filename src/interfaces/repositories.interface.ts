@@ -63,4 +63,5 @@ export interface IRideRequestsRepository {
   listAll(): Promise<RideRequest[]>
   create(rideRequest: Omit<RideRequest, 'id'>): Promise<RideRequest>
   update(id: string, partial: Partial<RideRequest>): Promise<void>
+  delete(id: string): Promise<void>
 }

@@ -38,5 +38,25 @@ export class RideRequestsService {
     if (!rideRequest) throw new HttpError(404, 'Ride request not found')
     return rideRequest
   }
+
+  async deleteRideRequest(id: string, userId: string): Promise<void> {
+    if (!userId) throw new HttpError(401, 'Unauthorized')
+
+    const rideRequest = await this.getRideRequestById(id)
+
+    if (rideRequest.creator.id !== userId) {
+      throw new HttpError(403, 'You are not authorized to delete this ride request')
+    }
+
+    if (rideRequest.deletedAt !== null) {
+      throw new HttpError(400, 'Ride request is already deleted')
+    }
+
+    if (rideRequest.status === RideRequestStatus.Canceled) {
+      throw new HttpError(400, 'Ride request is already canceled')
+    }
+
+    await this.rideRequestsRepo.delete(id)
+  }
 }
 
