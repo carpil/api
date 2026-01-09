@@ -60,6 +60,13 @@ export class ChatsRepository implements IChatsRepository {
   async updateLastMessage(chatId: string, lastMessage: Message): Promise<void> {
     await firestore.collection('chats').doc(chatId).update({ lastMessage })
   }
+
+  async removeParticipant(chatId: string, userId: string): Promise<void> {
+    await firestore.collection('chats').doc(chatId).update({
+      participants: FieldValue.arrayRemove(userId),
+      updatedAt: new Date()
+    })
+  }
 }
 
 

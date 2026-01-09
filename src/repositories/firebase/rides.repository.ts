@@ -65,6 +65,14 @@ export class RidesRepository implements IRidesRepository {
     })
   }
 
+  async removePassenger(rideId: string, passengerInfo: UserInfo): Promise<void> {
+    await firestore.collection('rides').doc(rideId).update({
+      passengers: FieldValue.arrayRemove(passengerInfo),
+      availableSeats: FieldValue.increment(1),
+      updatedAt: new Date()
+    })
+  }
+
   async setParticipant(rideId: string, userId: string, participantStatus: { active: boolean, pendingToReview: boolean }): Promise<void> {
     await firestore.collection('rides').doc(rideId)
       .collection('participants').doc(userId)
