@@ -29,6 +29,11 @@ export class RidesController {
     res.json({ message: 'Successfully joined the ride' })
   })
 
+  leave = asyncHandler(async (req: AuthRequest, res: Response) => {
+    await this.ridesService.leaveRide(req.params.id, req.user?.uid ?? '')
+    res.json({ message: 'Successfully left the ride' })
+  })
+
   start = asyncHandler(async (req: AuthRequest, res: Response) => {
     await this.ridesService.startRide(req.params.id, req.user?.uid ?? '')
     res.json({ message: 'Ride started successfully' })

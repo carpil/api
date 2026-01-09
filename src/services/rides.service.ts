@@ -118,6 +118,44 @@ export class RidesService {
     }
   }
 
+  async leaveRide(rideId: string, passengerId: string): Promise<void> {
+    const ride = await this.getRideById(rideId)
+
+    const passengerInRide = ride.passengers.find((p: any) => p.id === passengerId)
+    if (!passengerInRide) throw new HttpError(403, 'You are not a passenger on this ride')
+
+    const isRideInProgress = ride.status === RideStatus.InProgress || ride.status === RideStatus.InRoute
+    const isRideCompleted = ride.status === RideStatus.Completed || ride.status === RideStatus.OnCheckout
+    if (isRideInProgress) throw new HttpError(400, 'Cannot leave a ride that is in progress')
+    if (isRideCompleted) throw new HttpError(400, 'Cannot leave a ride that has been completed')
+
+    const passenger = await this.usersRepo.getById(passengerId)
+    if (!passenger) throw new HttpError(404, 'Passenger not found')
+
+    const passengerInfo = { id: passengerInRide.id, name: passengerInRide.name, profilePicture: passengerInRide.profilePicture }
+    await this.ridesRepo.removePassenger(rideId, passengerInfo)
+    if (ride.chatId) await this.chatsRepo.removeParticipant(ride.chatId, passengerId)
+
+    const deviceTokens: string[] = []
+    const driver = await this.usersRepo.getById(ride.driver.id)
+    if (driver) deviceTokens.push(...(driver.pushToken || []))
+
+    const remainingPassengers = ride.passengers.filter((p: any) => p.id !== passengerId)
+    for (const p of remainingPassengers) {
+      const passengerUser = await this.usersRepo.getById(p.id)
+      deviceTokens.push(...(passengerUser?.pushToken || []))
+    }
+
+    if (deviceTokens.length > 0) {
+      await sendPushNotifications({
+        pushTokens: deviceTokens,
+        title: 'Un pasajero ha abandonado el viaje',
+        body: `${passenger.name} ha abandonado el viaje.`,
+        data: { rideId, passengerId, url: `carpil://ride/${rideId}?source=push` }
+      })
+    }
+  }
+
   async startRide(rideId: string, driverId: string) {
     const ride = await this.getRideById(rideId)
     if (ride.driver.id !== driverId) throw new HttpError(403, 'Only the driver can start this ride')
