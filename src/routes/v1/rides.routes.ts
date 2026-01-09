@@ -16,6 +16,7 @@ const createRidesRouter = (ridesController: RidesController, paymentsController:
   router.post('/:id/start', authenticate, (req, res, next) => ridesController.start(req, res, next))
   router.post('/:id/complete', authenticate, (req, res, next) => ridesController.complete(req, res, next))
   router.get('/:id/payments', authenticate, (req, res, next) => paymentsController.getPaymentsByRide(req, res, next))
+  router.delete('/:id', authenticate, (req, res, next) => ridesController.delete(req, res, next))
 
   return router
 }
