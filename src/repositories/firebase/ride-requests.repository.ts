@@ -49,5 +49,13 @@ export class RideRequestsRepository implements IRideRequestsRepository {
   async update(rideRequestId: string, rideRequestUpdates: Partial<RideRequest>): Promise<void> {
     await firestore.collection('ride-requests').doc(rideRequestId).update(rideRequestUpdates)
   }
+
+  async delete(rideRequestId: string): Promise<void> {
+    await firestore.collection('ride-requests').doc(rideRequestId).update({
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+      status: RideRequestStatus.Canceled
+    })
+  }
 }
 

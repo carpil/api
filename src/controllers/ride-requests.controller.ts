@@ -23,5 +23,10 @@ export class RideRequestsController {
     const rideRequest = await this.rideRequestsService.createRideRequest(userId ?? '', input)
     res.status(201).json({ rideRequest })
   })
+
+  delete = asyncHandler(async (req: AuthRequest, res: Response) => {
+    await this.rideRequestsService.deleteRideRequest(req.params.id, req.user?.uid ?? '')
+    res.json({ message: 'Ride request deleted successfully' })
+  })
 }
 
