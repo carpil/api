@@ -40,6 +40,7 @@ export interface IChatsRepository {
   addParticipant(chatId: string, userId: string): Promise<void>
   addMessage(chatId: string, message: Message): Promise<void>
   updateLastMessage(chatId: string, message: Message): Promise<void>
+  softDelete(chatId: string): Promise<void>
 }
 
 // Rating repository interface

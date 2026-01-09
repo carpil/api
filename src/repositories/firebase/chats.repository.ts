@@ -67,6 +67,13 @@ export class ChatsRepository implements IChatsRepository {
       updatedAt: new Date()
     })
   }
+
+  async softDelete(chatId: string): Promise<void> {
+    await firestore.collection('chats').doc(chatId).update({
+      deletedAt: new Date(),
+      updatedAt: new Date()
+    })
+  }
 }
 
 

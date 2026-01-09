@@ -258,6 +258,48 @@ export class RidesService {
     
     await this.usersRepo.update(userId, { pendingReviewRideIds: updatedPending })
   }
+
+  async deleteRide(rideId: string, driverId: string): Promise<void> {
+    if (!driverId) throw new HttpError(401, 'Unauthorized')
+
+    const ride = await this.getRideById(rideId)
+
+    if (ride.driver.id !== driverId) {
+      throw new HttpError(403, 'Only the driver can delete this ride')
+    }
+
+    if (ride.status !== RideStatus.Active) {
+      throw new HttpError(400, 'Only active rides can be deleted')
+    }
+
+    await this.ridesRepo.update(rideId, {
+      deletedAt: new Date(),
+      updatedAt: new Date()
+    })
+
+    if (ride.chatId) {
+      await this.chatsRepo.softDelete(ride.chatId)
+    }
+
+    const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+    if (passengers.length > 0) {
+      const deviceTokens: string[] = []
+      for (const passenger of passengers) {
+        const passengerUser = await this.usersRepo.getById(passenger.id)
+        deviceTokens.push(...(passengerUser?.pushToken || []))
+      }
+
+      if (deviceTokens.length > 0) {
+        const driver = await this.usersRepo.getById(driverId)
+        await sendPushNotifications({
+          pushTokens: deviceTokens,
+          title: 'Viaje cancelado',
+          body: `El conductor ${driver?.name ?? ''} ha cancelado el viaje.`,
+          data: { rideId, url: 'carpil://rides?source=push' }
+        })
+      }
+    }
+  }
 }
 
 
