@@ -66,7 +66,12 @@ export class RidesService {
   }
 
   async listDriverRides() {
-    return this.ridesRepo.listAllDrivers()
+    const allRides = await this.ridesRepo.listAllDrivers()
+    return allRides.filter(ride => {
+      const isActive = ride.status === RideStatus.Active
+      const isNotDeleted = ride.deletedAt === null
+      return isActive && isNotDeleted
+    })
   }
 
   async getRideById(id: string) {
@@ -273,7 +278,7 @@ export class RidesService {
     }
 
     await this.ridesRepo.update(rideId, {
-      deletedAt: new Date(),
+      deletedAt: new Date(), 
       updatedAt: new Date()
     })
 
