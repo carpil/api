@@ -951,6 +951,12 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
     const otherParticipants = chat.participants.filter(p => p !== currentUserId)
     const pushMessages = []
 
+    const senderSnapshot = await firestore.collection('users').doc(currentUserId).get()
+    const rideSnapshot = chat.rideId ? await firestore.collection('rides').doc(chat.rideId).get() : null
+    const rideData = rideSnapshot?.data() as Ride | undefined
+    const isDriver = currentUserId === rideData?.driver?.id
+    const senderName = senderSnapshot.data()?.name || (isDriver ? 'Conductor' : 'Pasajero')
+
     for (const participantId of otherParticipants) {
       try {
         const userSnapshot = await firestore.collection('users').doc(participantId).get()
@@ -963,7 +969,7 @@ app.post('/chats/:id/messages', authenticate, async (req: AuthRequest, res) => {
               to: pushToken,
               sound: 'default',
               title: 'Nuevo mensaje',
-              body: messageRequest.data.content.slice(0, 80),
+              body: `${senderName} : ${messageRequest.data.content.slice(0, 80)}`,
               data: {
                 chatId,
                 senderId: currentUserId
