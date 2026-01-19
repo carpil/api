@@ -18,7 +18,7 @@ export class RidesService {
     private readonly usersRepo: UsersRepository,
     private readonly chatsRepo: ChatsRepository,
     private readonly paymentsRepo: PaymentsRepository
-  ) {}
+  ) { }
 
   async createRide(driverId: string, rideData: CreateRideInput): Promise<Ride> {
     if (!driverId) throw new HttpError(401, 'Unauthorized')
@@ -167,14 +167,14 @@ export class RidesService {
     if (ride.status !== RideStatus.Active) throw new HttpError(400, 'Ride cannot be started in its current status')
 
     await this.ridesRepo.update(rideId, { status: RideStatus.InProgress, startedAt: new Date(), updatedAt: new Date() })
-    await this.usersRepo.update(driverId, { currentRideId: rideId })
+    await this.usersRepo.update(driverId, { currentRideId: rideId, inRide: true })
     await this.ridesRepo.setParticipant(rideId, driverId, { active: true, pendingToReview: false })
 
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const deviceTokens: string[] = []
 
     for (const passenger of passengers) {
-      await this.usersRepo.update(passenger.id, { currentRideId: rideId })
+      await this.usersRepo.update(passenger.id, { currentRideId: rideId, inRide: true })
       await this.ridesRepo.setParticipant(rideId, passenger.id, { active: true, pendingToReview: false })
 
       const passengerUser = await this.usersRepo.getById(passenger.id)
@@ -206,7 +206,7 @@ export class RidesService {
 
     // Set ride status to on-checkout instead of completed
     await this.ridesRepo.update(rideId, { status: RideStatus.OnCheckout, completedAt: new Date(), updatedAt: new Date() })
-    await this.usersRepo.update(driverId, { currentRideId: null })
+    await this.usersRepo.update(driverId, { currentRideId: null, inRide: false })
     await this.ridesRepo.setParticipant(rideId, driverId, { active: false, pendingToReview: driverPendingTargets })
 
     // Driver can review immediately (doesn't need to pay)
@@ -220,8 +220,8 @@ export class RidesService {
     // Create payment records for each passenger
     for (const passenger of passengers) {
       const passengerUser = await this.usersRepo.getById(passenger.id)
-      await this.usersRepo.update(passenger.id, { currentRideId: null })
-      
+      await this.usersRepo.update(passenger.id, { currentRideId: null, inRide: false })
+
       // Create payment record for passenger
       await this.paymentsRepo.createPayment(rideId, {
         userId: passenger.id,
@@ -260,7 +260,7 @@ export class RidesService {
 
     const currentPending = user.pendingReviewRideIds || []
     const updatedPending = [rideId, ...currentPending.filter(id => id !== rideId)]
-    
+
     await this.usersRepo.update(userId, { pendingReviewRideIds: updatedPending })
   }
 
@@ -278,7 +278,7 @@ export class RidesService {
     }
 
     await this.ridesRepo.update(rideId, {
-      deletedAt: new Date(), 
+      deletedAt: new Date(),
       updatedAt: new Date()
     })
 
