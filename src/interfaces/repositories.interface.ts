@@ -40,6 +40,7 @@ export interface IChatsRepository {
   addParticipant(chatId: string, userId: string): Promise<void>
   addMessage(chatId: string, message: Message): Promise<void>
   updateLastMessage(chatId: string, message: Message): Promise<void>
+  softDelete(chatId: string): Promise<void>
 }
 
 // Rating repository interface
@@ -63,4 +64,5 @@ export interface IRideRequestsRepository {
   listAll(): Promise<RideRequest[]>
   create(rideRequest: Omit<RideRequest, 'id'>): Promise<RideRequest>
   update(id: string, partial: Partial<RideRequest>): Promise<void>
+  delete(id: string): Promise<void>
 }

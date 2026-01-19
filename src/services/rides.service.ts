@@ -18,7 +18,7 @@ export class RidesService {
     private readonly usersRepo: UsersRepository,
     private readonly chatsRepo: ChatsRepository,
     private readonly paymentsRepo: PaymentsRepository
-  ) {}
+  ) { }
 
   async createRide(driverId: string, rideData: CreateRideInput): Promise<Ride> {
     if (!driverId) throw new HttpError(401, 'Unauthorized')
@@ -66,7 +66,12 @@ export class RidesService {
   }
 
   async listDriverRides() {
-    return this.ridesRepo.listAllDrivers()
+    const allRides = await this.ridesRepo.listAllDrivers()
+    return allRides.filter(ride => {
+      const isActive = ride.status === RideStatus.Active
+      const isNotDeleted = ride.deletedAt === null
+      return isActive && isNotDeleted
+    })
   }
 
   async getRideById(id: string) {
@@ -118,20 +123,58 @@ export class RidesService {
     }
   }
 
+  async leaveRide(rideId: string, passengerId: string): Promise<void> {
+    const ride = await this.getRideById(rideId)
+
+    const passengerInRide = ride.passengers.find((p: any) => p.id === passengerId)
+    if (!passengerInRide) throw new HttpError(403, 'You are not a passenger on this ride')
+
+    const isRideInProgress = ride.status === RideStatus.InProgress || ride.status === RideStatus.InRoute
+    const isRideCompleted = ride.status === RideStatus.Completed || ride.status === RideStatus.OnCheckout
+    if (isRideInProgress) throw new HttpError(400, 'Cannot leave a ride that is in progress')
+    if (isRideCompleted) throw new HttpError(400, 'Cannot leave a ride that has been completed')
+
+    const passenger = await this.usersRepo.getById(passengerId)
+    if (!passenger) throw new HttpError(404, 'Passenger not found')
+
+    const passengerInfo = { id: passengerInRide.id, name: passengerInRide.name, profilePicture: passengerInRide.profilePicture }
+    await this.ridesRepo.removePassenger(rideId, passengerInfo)
+    if (ride.chatId) await this.chatsRepo.removeParticipant(ride.chatId, passengerId)
+
+    const deviceTokens: string[] = []
+    const driver = await this.usersRepo.getById(ride.driver.id)
+    if (driver) deviceTokens.push(...(driver.pushToken || []))
+
+    const remainingPassengers = ride.passengers.filter((p: any) => p.id !== passengerId)
+    for (const p of remainingPassengers) {
+      const passengerUser = await this.usersRepo.getById(p.id)
+      deviceTokens.push(...(passengerUser?.pushToken || []))
+    }
+
+    if (deviceTokens.length > 0) {
+      await sendPushNotifications({
+        pushTokens: deviceTokens,
+        title: 'Un pasajero ha abandonado el viaje',
+        body: `${passenger.name} ha abandonado el viaje.`,
+        data: { rideId, passengerId, url: `carpil://ride/${rideId}?source=push` }
+      })
+    }
+  }
+
   async startRide(rideId: string, driverId: string) {
     const ride = await this.getRideById(rideId)
     if (ride.driver.id !== driverId) throw new HttpError(403, 'Only the driver can start this ride')
     if (ride.status !== RideStatus.Active) throw new HttpError(400, 'Ride cannot be started in its current status')
 
     await this.ridesRepo.update(rideId, { status: RideStatus.InProgress, startedAt: new Date(), updatedAt: new Date() })
-    await this.usersRepo.update(driverId, { currentRideId: rideId })
+    await this.usersRepo.update(driverId, { currentRideId: rideId, inRide: true })
     await this.ridesRepo.setParticipant(rideId, driverId, { active: true, pendingToReview: false })
 
     const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
     const deviceTokens: string[] = []
 
     for (const passenger of passengers) {
-      await this.usersRepo.update(passenger.id, { currentRideId: rideId })
+      await this.usersRepo.update(passenger.id, { currentRideId: rideId, inRide: true })
       await this.ridesRepo.setParticipant(rideId, passenger.id, { active: true, pendingToReview: false })
 
       const passengerUser = await this.usersRepo.getById(passenger.id)
@@ -163,7 +206,7 @@ export class RidesService {
 
     // Set ride status to on-checkout instead of completed
     await this.ridesRepo.update(rideId, { status: RideStatus.OnCheckout, completedAt: new Date(), updatedAt: new Date() })
-    await this.usersRepo.update(driverId, { currentRideId: null })
+    await this.usersRepo.update(driverId, { currentRideId: null, inRide: false })
     await this.ridesRepo.setParticipant(rideId, driverId, { active: false, pendingToReview: driverPendingTargets })
 
     // Driver can review immediately (doesn't need to pay)
@@ -177,8 +220,8 @@ export class RidesService {
     // Create payment records for each passenger
     for (const passenger of passengers) {
       const passengerUser = await this.usersRepo.getById(passenger.id)
-      await this.usersRepo.update(passenger.id, { currentRideId: null })
-      
+      await this.usersRepo.update(passenger.id, { currentRideId: null, inRide: false })
+
       // Create payment record for passenger
       await this.paymentsRepo.createPayment(rideId, {
         userId: passenger.id,
@@ -217,8 +260,50 @@ export class RidesService {
 
     const currentPending = user.pendingReviewRideIds || []
     const updatedPending = [rideId, ...currentPending.filter(id => id !== rideId)]
-    
+
     await this.usersRepo.update(userId, { pendingReviewRideIds: updatedPending })
+  }
+
+  async deleteRide(rideId: string, driverId: string): Promise<void> {
+    if (!driverId) throw new HttpError(401, 'Unauthorized')
+
+    const ride = await this.getRideById(rideId)
+
+    if (ride.driver.id !== driverId) {
+      throw new HttpError(403, 'Only the driver can delete this ride')
+    }
+
+    if (ride.status !== RideStatus.Active) {
+      throw new HttpError(400, 'Only active rides can be deleted')
+    }
+
+    await this.ridesRepo.update(rideId, {
+      deletedAt: new Date(),
+      updatedAt: new Date()
+    })
+
+    if (ride.chatId) {
+      await this.chatsRepo.softDelete(ride.chatId)
+    }
+
+    const passengers = Array.isArray(ride.passengers) ? ride.passengers : []
+    if (passengers.length > 0) {
+      const deviceTokens: string[] = []
+      for (const passenger of passengers) {
+        const passengerUser = await this.usersRepo.getById(passenger.id)
+        deviceTokens.push(...(passengerUser?.pushToken || []))
+      }
+
+      if (deviceTokens.length > 0) {
+        const driver = await this.usersRepo.getById(driverId)
+        await sendPushNotifications({
+          pushTokens: deviceTokens,
+          title: 'Viaje cancelado',
+          body: `El conductor ${driver?.name ?? ''} ha cancelado el viaje.`,
+          data: { rideId, url: 'carpil://rides?source=push' }
+        })
+      }
+    }
   }
 }
 

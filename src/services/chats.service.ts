@@ -4,13 +4,14 @@ import { HttpError } from '../utils/http'
 import { encryptMessage, decryptMessage } from '../utils/crypto'
 import { sendPushNotifications } from 'config/push-notifications'
 import { RidesRepository } from '@repositories/firebase/rides.repository'
+import { RideStatus } from '@models/ride.model'
 
 export class ChatsService {
   constructor(
     private readonly chatsRepo: ChatsRepository,
     private readonly usersRepo: UsersRepository,
     private readonly ridesRepo: RidesRepository
-  ) {}
+  ) { }
 
   async listChats(currentUserId: string) {
     const chats = await this.chatsRepo.listByParticipant(currentUserId)
@@ -35,7 +36,19 @@ export class ChatsService {
       }
     }
 
-    return chats.map(chat => {
+    // Filter chats by active or in progress rides
+    const filteredChats = chats.filter(chat => {
+      // Include chats without a rideId
+      if (!chat.rideId) return true
+
+      // Include chats with rides that are active or in progress
+      const ride = ridesMap.get(chat.rideId)
+      if (!ride) return false
+
+      return ride.status === RideStatus.Active || ride.status === RideStatus.InProgress
+    })
+
+    return filteredChats.map(chat => {
       // Map to UserInfo format (simplified)
       const members = chat.participants
         .map((uid: string) => {
@@ -43,12 +56,12 @@ export class ChatsService {
           return user ? { id: user.id, name: user.name, profilePicture: user.profilePicture } : null
         })
         .filter(Boolean)
-      
+
       const ownerUser = usersMap.get(chat.owner)
-      const owner = ownerUser 
+      const owner = ownerUser
         ? { id: ownerUser.id, name: ownerUser.name, profilePicture: ownerUser.profilePicture }
         : undefined
-      
+
       const lastMessage = chat.lastMessage
         ? { ...chat.lastMessage, content: decryptMessage(chat.lastMessage.content) }
         : undefined
@@ -56,13 +69,13 @@ export class ChatsService {
       // Include ride information if available
       const rideInfo = chat.rideId && ridesMap.has(chat.rideId)
         ? (() => {
-            const ride = ridesMap.get(chat.rideId)
-            return {
-              origin: ride.origin,
-              destination: ride.destination,
-              status: ride.status
-            }
-          })()
+          const ride = ridesMap.get(chat.rideId)
+          return {
+            origin: ride.origin,
+            destination: ride.destination,
+            status: ride.status
+          }
+        })()
         : undefined
 
       return { ...chat, participants: members, owner, lastMessage, ride: rideInfo }
@@ -142,16 +155,19 @@ export class ChatsService {
     }
 
     const currentRide = await this.ridesRepo.getById(chat.rideId)
+    const senderUser = await this.usersRepo.getById(currentUserId)
+    const isDriver = currentUserId === currentRide?.driver.id
+    const senderName = senderUser?.name || (isDriver ? 'Conductor' : 'Pasajero')
     const title = `${currentRide?.origin.name.primary} ➡️ ${currentRide?.destination.name.primary}`
     if (deviceTokens.length > 0) {
       await sendPushNotifications({
         pushTokens: deviceTokens,
         title: `${title}`,
-        body: `${currentUserId} : ${content.slice(0, 80)}`,
-        data: { 
-          chatId, 
+        body: `${senderName} : ${content.slice(0, 80)}`,
+        data: {
+          chatId,
           senderId: currentUserId,
-          url: `carpil://chats/messages/${chatId}?source=push`
+          url: `carpil://chats/${chatId}?source=push`
         }
       })
     }

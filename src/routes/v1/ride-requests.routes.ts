@@ -10,6 +10,7 @@ const createRideRequestsRouter = (rideRequestsController: RideRequestsController
   router.get('/', authenticate, (req, res, next) => rideRequestsController.list(req, res, next))
   router.get('/:id', authenticate, (req, res, next) => rideRequestsController.getById(req, res, next))
   router.post('/', authenticate, validateBody(CreateRideRequestSchema), (req, res, next) => rideRequestsController.create(req, res, next))
+  router.delete('/:id', authenticate, (req, res, next) => rideRequestsController.delete(req, res, next))
 
   return router
 }
