@@ -4,6 +4,7 @@ import { HttpError } from '../utils/http'
 import { encryptMessage, decryptMessage } from '../utils/crypto'
 import { sendPushNotifications } from 'config/push-notifications'
 import { RidesRepository } from '@repositories/firebase/rides.repository'
+import { RideStatus } from '@models/ride.model'
 
 export class ChatsService {
   constructor(
@@ -35,7 +36,19 @@ export class ChatsService {
       }
     }
 
-    return chats.map(chat => {
+    // Filter chats by active or in progress rides
+    const filteredChats = chats.filter(chat => {
+      // Include chats without a rideId
+      if (!chat.rideId) return true
+
+      // Include chats with rides that are active or in progress
+      const ride = ridesMap.get(chat.rideId)
+      if (!ride) return false
+
+      return ride.status === RideStatus.Active || ride.status === RideStatus.InProgress
+    })
+
+    return filteredChats.map(chat => {
       // Map to UserInfo format (simplified)
       const members = chat.participants
         .map((uid: string) => {
