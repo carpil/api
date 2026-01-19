@@ -13,7 +13,7 @@ export class UsersService {
     private readonly ratingsService: RatingsService,
     private readonly ridesService: RidesService,
     private readonly ridesRepo: RidesRepository
-  ) {}
+  ) { }
 
   async signup(currentUser: { uid: string, email?: string }, input: User) {
     if (!currentUser?.uid || input.id !== currentUser.uid) throw new HttpError(401, 'Unauthorized')
@@ -119,7 +119,7 @@ export class UsersService {
 
     const pendingReviewRideIds = user.pendingReviewRideIds || []
     const pendingPaymentRideIds = user.pendingPaymentRideIds || []
-    
+
     // Step 1: If in progress, rideId is currentRideId
     if (inRide) return { rideId: user.currentRideId, inRide, pendingReviews: null, pendingPayment: null, isDriver }
 
@@ -127,7 +127,7 @@ export class UsersService {
     let pendingPayment: RideInfo | null = null
     if (pendingPaymentRideIds.length > 0) {
       const mostRecentPaymentRideId = pendingPaymentRideIds[0]
-      
+
       try {
         const ride = await this.ridesService.getRideById(mostRecentPaymentRideId)
         // Only create pendingPayment info if user is not the driver
@@ -146,22 +146,23 @@ export class UsersService {
     }
 
     // Step 3: Check for pending reviews
-    let pendingReviews: UserInfo[] | null = null
+    let pendingReviews: Array<UserInfo & { rideId: string }> | null = null
     let rideId: string | null = null
-    
+
     if (pendingReviewRideIds.length > 0) {
       const mostRecentRideId = pendingReviewRideIds[0]
       rideId = mostRecentRideId
-      
+
       try {
         const pendingRide = await this.ratingsService.listPending(mostRecentRideId, userId)
-        
+
         if (pendingRide.pendingUserIds.length > 0) {
           pendingReviews = pendingRide.pendingUsers.map((item: any) => ({
             id: item.user.id,
             name: item.user.name,
             profilePicture: item.user.profilePicture,
-            role: item.isDriver ? 'driver' : 'passenger'
+            role: item.isDriver ? 'driver' : 'passenger',
+            rideId: mostRecentRideId
           }))
         }
       } catch (error) {
@@ -174,9 +175,9 @@ export class UsersService {
       rideId = pendingPayment.rideId
     }
 
-    return { 
-      rideId, 
-      inRide, 
+    return {
+      rideId,
+      inRide,
       pendingReviews,
       pendingPayment,
       isDriver
