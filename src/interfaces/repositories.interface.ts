@@ -18,6 +18,9 @@ export interface IUsersRepository {
   create(id: string, user: User): Promise<void>
   update(id: string, partial: Partial<User>): Promise<void>
   exists(id: string): Promise<boolean>
+  setDriverApproved(userId: string, vehicleId: string, applicationId: string): Promise<void>
+  updateDriverStatus(userId: string, status: 'active' | 'suspended' | 'blocked'): Promise<void>
+  setDriverApplicationId(userId: string, applicationId: string): Promise<void>
 }
 
 // Ride repository interface

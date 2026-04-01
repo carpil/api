@@ -13,6 +13,10 @@ export interface User {
   inRide?: boolean
   pendingReviewRideIds?: string[]
   pendingPaymentRideIds?: string[]
+  isDriver?: boolean
+  driverStatus?: 'active' | 'suspended' | 'blocked'
+  vehicleId?: string
+  driverApplicationId?: string
   createdAt?: Date
   updatedAt?: Date
 }
