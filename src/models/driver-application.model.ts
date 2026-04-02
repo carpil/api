@@ -12,6 +12,7 @@ export interface DriverApplicationDocument {
   cedulaBack: string
   vehicleRegistration: string
   criminalRecord?: string
+  selfie?: string
 }
 
 export interface DriverApplicationStatusHistory {
@@ -72,7 +73,8 @@ export const driverApplicationDocumentSchema = z.object({
   cedulaFront: z.string().url(),
   cedulaBack: z.string().url(),
   vehicleRegistration: z.string().url(),
-  criminalRecord: z.string().url().optional()
+  criminalRecord: z.string().url().optional(),
+  selfie: z.string().url().optional()
 })
 
 export const CreateDriverApplicationSchema = z.object({
