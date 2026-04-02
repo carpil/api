@@ -10,6 +10,7 @@ import { ChatsService } from '../services/chats.service'
 import { RatingsService } from '../services/ratings.service'
 import { NotificationsService } from '../services/notifications.service'
 import { RideRequestsService } from '../services/ride-requests.service'
+import { DriverApplicationService } from '../services/driver-application.service'
 import { PaymentsController } from '../controllers/payments.controller'
 import { RidesController } from '../controllers/rides.controller'
 import { UsersController } from '../controllers/users.controller'
@@ -17,6 +18,7 @@ import { ChatsController } from '../controllers/chats.controller'
 import { RatingsController } from '../controllers/ratings.controller'
 import { NotificationsController } from '../controllers/notifications.controller'
 import { RideRequestsController } from '../controllers/ride-requests.controller'
+import { DriverApplicationController } from '../controllers/driver-application.controller'
 import createRoutes from '../routes'
 
 export const createApp = (webhooksController: WebhooksController) => {
@@ -41,6 +43,8 @@ export const createApp = (webhooksController: WebhooksController) => {
   const ratingsRepo = RepositoryFactory.createRatingsRepository()
   const notificationsRepo = RepositoryFactory.createNotificationsRepository()
   const rideRequestsRepo = RepositoryFactory.createRideRequestsRepository()
+  const driverApplicationRepo = RepositoryFactory.createDriverApplicationRepository()
+  const vehicleRepo = RepositoryFactory.createVehicleRepository()
 
   // Initialize all services
   const paymentsService = new PaymentsService(paymentsRepo, ridesRepo, usersRepo)
@@ -50,6 +54,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const ratingsService = new RatingsService(ratingsRepo, ridesRepo, usersRepo)
   const notificationsService = new NotificationsService(notificationsRepo)
   const rideRequestsService = new RideRequestsService(rideRequestsRepo, usersRepo)
+  const driverApplicationService = new DriverApplicationService(driverApplicationRepo, vehicleRepo, usersRepo)
 
   // Initialize all controllers
   const paymentsController = new PaymentsController(paymentsService)
@@ -59,6 +64,7 @@ export const createApp = (webhooksController: WebhooksController) => {
   const ratingsController = new RatingsController(ratingsService)
   const notificationsController = new NotificationsController(notificationsService)
   const rideRequestsController = new RideRequestsController(rideRequestsService)
+  const driverApplicationController = new DriverApplicationController(driverApplicationService)
 
   // Create routes with all controllers
   const routes = createRoutes({
@@ -68,7 +74,8 @@ export const createApp = (webhooksController: WebhooksController) => {
     chatsController,
     ratingsController,
     notificationsController,
-    rideRequestsController
+    rideRequestsController,
+    driverApplicationController
   })
 
   app.use('/', routes)

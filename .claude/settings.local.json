@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/robertramirez/Documents/Carpil/api -type f -name *.prisma -o -name *schema* -o -name *migration* -o -name *model* -o -name *entity*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls /Users/robertramirez/Documents/Carpil/api/.env*)"
+    ]
+  }
+}

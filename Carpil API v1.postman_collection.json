@@ -1,0 +1,932 @@
+{
+  "info": {
+    "_postman_id": "3b75df9a-61c6-4df2-b1f4-863b071b24e1",
+    "name": "Carpil API v1",
+    "description": "Complete API collection for Carpil ride-sharing application",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "48757392",
+    "_collection_link": "https://go.postman.co/collection/48757392-3b75df9a-61c6-4df2-b1f4-863b071b24e1?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Rides",
+      "item": [
+        {
+          "name": "List Driver Rides",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/rides/drivers",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "rides",
+                "drivers"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Driver Rides Copy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/users/signup/email",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "signup",
+                "email"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Ride by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/rides/drivers/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "rides",
+                "drivers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{ride_id}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"origin\": \"Downtown Plaza\",\n  \"destination\": \"Airport Terminal 1\",\n  \"meetingPoint\": \"Main Entrance\",\n  \"availableSeats\": 3,\n  \"price\": 15.50,\n  \"departureDate\": \"2024-01-15T10:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/rides",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "rides"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Join Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/rides/:id/join",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "rides",
+                ":id",
+                "join"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ride_id_here",
+                  "description": "The ride ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/rides/:id/start",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "rides",
+                ":id",
+                "start"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "xfPiGTmTgYGbTwCWbkhT",
+                  "description": "The ride ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Complete Ride",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/rides/b2F35mA2JR4mGSTJuZZP/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "rides",
+                "b2F35mA2JR4mGSTJuZZP",
+                "complete"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/users/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "XibGqbCk9FUAc19Eghns95DXtfh2",
+                  "description": "The user ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "User Signup",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"user123\",\n  \"name\": \"John Doe\",\n  \"profilePicture\": \"https://example.com/profile.jpg\",\n  \"email\": \"john.doe@example.com\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phoneNumber\": \"+1234567890\",\n  \"profileCompleted\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/users/signup",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "signup"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "User Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"user123\",\n  \"name\": \"John Doe\",\n  \"profilePicture\": \"https://example.com/profile.jpg\",\n  \"email\": \"john.doe@example.com\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phoneNumber\": \"+1234567890\",\n  \"profileCompleted\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/users/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Social Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"user123\",\n  \"name\": \"John Doe\",\n  \"profilePicture\": \"https://example.com/profile.jpg\",\n  \"email\": \"john.doe@example.com\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phoneNumber\": \"+1234567890\",\n  \"profileCompleted\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/users/login/social",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "login",
+                "social"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bootstrap",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/users/me/bootstrap",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "me",
+                "bootstrap"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chats",
+      "item": [
+        {
+          "name": "List My Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/chats",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "chats"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/chats/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "chats",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "chat_id_here",
+                  "description": "The chat ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Hello! I'm on my way to the meeting point.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/chats/:id/messages",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "chats",
+                ":id",
+                "messages"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "chat_id_here",
+                  "description": "The chat ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ratings",
+      "item": [
+        {
+          "name": "Create Rating",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetUserId\": \"user123\",\n  \"rideId\": \"ride456\",\n  \"rating\": 5,\n  \"comment\": \"Great driver! Very punctual and friendly.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/ratings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "ratings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Pending Ratings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/ratings/rides/:rideId/pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "ratings",
+                "rides",
+                ":rideId",
+                "pending"
+              ],
+              "variable": [
+                {
+                  "key": "rideId",
+                  "value": "ride_id_here",
+                  "description": "The ride ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Add Push Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/notifications/token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "notifications",
+                "token"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove Push Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushToken\": \"ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/notifications/token/remove",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "notifications",
+                "token",
+                "remove"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Driver Applications",
+      "item": [
+        {
+          "name": "Submit Application",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Roberto Ramirez\",\n  \"cedula\": \"123456789\",\n  \"address\": \"San José, Costa Rica\",\n  \"whatsapp\": \"88887777\",\n  \"vehicle\": {\n    \"brand\": \"Toyota\",\n    \"model\": \"Corolla\",\n    \"year\": 2020,\n    \"color\": \"Blanco\",\n    \"plate\": \"ABC123\",\n    \"availableSeats\": 3\n  },\n  \"documents\": {\n    \"cedulaFront\": \"https://example.com/cedula-front.jpg\",\n    \"cedulaBack\": \"https://example.com/cedula-back.jpg\",\n    \"vehicleRegistration\": \"https://example.com/marchamo.jpg\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Application",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications/me",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update My Application",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Roberto Ramirez Actualizado\",\n  \"vehicle\": {\n    \"brand\": \"Honda\",\n    \"model\": \"Civic\",\n    \"year\": 2021,\n    \"color\": \"Negro\",\n    \"plate\": \"XYZ999\",\n    \"availableSeats\": 4\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications/me",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Applications (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Applications by Status (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications?status=pending",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "pending | in_review | changes_requested | approved | rejected"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Application by ID (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications/:id",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "Application ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Application Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"note\": \"Todo en orden\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications/:id/status",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "",
+                  "description": "Application ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Driver Status (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/driver-applications/users/:userId/driver-status",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "driver-applications", "users", ":userId", "driver-status"],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "",
+                  "description": "User ID"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "{{base_url}}/v1/users/me/bootstrap",
+      "request": {
+        "auth": {
+          "type": "basic"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{auth_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/v1/users/me/bootstrap",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "users",
+            "me",
+            "bootstrap"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}
