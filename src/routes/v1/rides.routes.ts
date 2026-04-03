@@ -9,7 +9,7 @@ const createRidesRouter = (ridesController: RidesController, paymentsController:
   const router = Router()
 
   router.get('/drivers', (req, res, next) => ridesController.listDrivers(req, res, next))
-  router.get('/drivers/:id', authenticate, (req, res, next) => ridesController.getById(req, res, next))
+  router.get('/drivers/:id', (req, res, next) => ridesController.getById(req, res, next))
   router.post('/', authenticate, validateBody(CreateRideSchema), (req, res, next) => ridesController.create(req, res, next))
   router.post('/:id/join', authenticate, (req, res, next) => ridesController.join(req, res, next))
   router.post('/:id/leave', authenticate, (req, res, next) => ridesController.leave(req, res, next))
