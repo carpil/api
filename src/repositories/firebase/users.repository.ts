@@ -1,4 +1,5 @@
 import { firestore } from 'config/firebase'
+import { FieldValue } from 'firebase-admin/firestore'
 import { User } from '@models/user'
 import { IUsersRepository } from '@interfaces/repositories.interface'
 
@@ -26,6 +27,30 @@ export class UsersRepository implements IUsersRepository {
   async exists(userId: string): Promise<boolean> {
     const userDocument = await firestore.collection('users').doc(userId).get()
     return userDocument.exists
+  }
+
+  async setDriverApproved (userId: string, vehicleId: string, applicationId: string): Promise<void> {
+    await firestore.collection('users').doc(userId).update({
+      isDriver: true,
+      driverStatus: 'active',
+      vehicleId,
+      driverApplicationId: applicationId,
+      updatedAt: FieldValue.serverTimestamp()
+    })
+  }
+
+  async updateDriverStatus (userId: string, status: 'active' | 'suspended' | 'blocked'): Promise<void> {
+    await firestore.collection('users').doc(userId).update({
+      driverStatus: status,
+      updatedAt: FieldValue.serverTimestamp()
+    })
+  }
+
+  async setDriverApplicationId (userId: string, applicationId: string): Promise<void> {
+    await firestore.collection('users').doc(userId).update({
+      driverApplicationId: applicationId,
+      updatedAt: FieldValue.serverTimestamp()
+    })
   }
 }
 

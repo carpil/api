@@ -6,6 +6,7 @@ import { ChatsController } from '../controllers/chats.controller'
 import { RatingsController } from '../controllers/ratings.controller'
 import { NotificationsController } from '../controllers/notifications.controller'
 import { RideRequestsController } from '../controllers/ride-requests.controller'
+import { DriverApplicationController } from '../controllers/driver-application.controller'
 import createRidesRouter from './v1/rides.routes'
 import createChatsRouter from './v1/chats.routes'
 import createRatingsRouter from './v1/ratings.routes'
@@ -13,6 +14,7 @@ import createNotificationsRouter from './v1/notifications.routes'
 import createUsersRouter from './v1/users.routes'
 import createPaymentsRouter from './v1/payments.routes'
 import createRideRequestsRouter from './v1/ride-requests.routes'
+import createDriverApplicationRouter from './v1/driver-application.routes'
 
 export interface Controllers {
   paymentsController: PaymentsController
@@ -22,6 +24,7 @@ export interface Controllers {
   ratingsController: RatingsController
   notificationsController: NotificationsController
   rideRequestsController: RideRequestsController
+  driverApplicationController: DriverApplicationController
 }
 
 const createRoutes = (controllers: Controllers) => {
@@ -34,6 +37,7 @@ const createRoutes = (controllers: Controllers) => {
   router.use('/v1/users', createUsersRouter(controllers.usersController))
   router.use('/v1/payments', createPaymentsRouter(controllers.paymentsController))
   router.use('/v1/ride-requests', createRideRequestsRouter(controllers.rideRequestsController))
+  router.use('/v1/driver-applications', createDriverApplicationRouter(controllers.driverApplicationController))
 
   return router
 }

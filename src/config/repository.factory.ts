@@ -7,6 +7,8 @@ import { PaymentsRepository } from '../repositories/firebase/payments.repository
 import { RatingsRepository } from '../repositories/firebase/ratings.repository'
 import { NotificationsRepository } from '../repositories/firebase/notifications.repository'
 import { RideRequestsRepository } from '../repositories/firebase/ride-requests.repository'
+import { DriverApplicationRepository } from '../repositories/firebase/driver-application.repository'
+import { VehicleRepository } from '../repositories/firebase/vehicle.repository'
 // Future database implementations can be added here
 
 export type DatabaseType = 'firebase' | 'postgresql' | 'mongodb'
@@ -70,6 +72,24 @@ export class RepositoryFactory {
     switch (dbType) {
       case 'firebase':
         return new RideRequestsRepository()
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
+
+  static createDriverApplicationRepository(dbType: DatabaseType = 'firebase'): DriverApplicationRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new DriverApplicationRepository()
+      default:
+        throw new Error(`Unsupported database type: ${dbType}`)
+    }
+  }
+
+  static createVehicleRepository(dbType: DatabaseType = 'firebase'): VehicleRepository {
+    switch (dbType) {
+      case 'firebase':
+        return new VehicleRepository()
       default:
         throw new Error(`Unsupported database type: ${dbType}`)
     }

@@ -55,7 +55,7 @@ app.get('/rides/drivers', async (_req, res) => {
   res.json({ rides })
 })
 
-app.get('/rides/drivers/:id', authenticate, async (req: AuthRequest, res) => {
+app.get('/rides/drivers/:id', async (req: AuthRequest, res) => {
   const rideId = req.params.id
 
   const rideRef = await firestore.collection('rides').doc(rideId).get()
