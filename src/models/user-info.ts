@@ -3,4 +3,5 @@ export interface UserInfo {
   name: string
   profilePicture: string
   role: 'driver' | 'passenger'
+  phoneNumber?: string
 }
