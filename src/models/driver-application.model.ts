@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export type DriverApplicationStatus =
+  | 'draft'
   | 'pending'
   | 'in_review'
   | 'changes_requested'
@@ -41,6 +42,7 @@ export interface DriverApplication {
   vehicle: DriverApplicationVehicle
   documents: DriverApplicationDocument
   status: DriverApplicationStatus
+  currentStep: number
   reviewedBy?: string
   reviewNote?: string
   statusHistory: DriverApplicationStatusHistory[]
@@ -50,13 +52,16 @@ export interface DriverApplication {
 
 export type CreateDriverApplicationDto = Omit<
   DriverApplication,
-  'id' | 'status' | 'statusHistory' | 'createdAt' | 'updatedAt'
->
+  'id' | 'status' | 'currentStep' | 'statusHistory' | 'createdAt' | 'updatedAt' | 'vehicle' | 'documents'
+> & {
+  vehicle?: DriverApplicationVehicle
+  documents?: DriverApplicationDocument
+}
 
 export type UpdateDriverApplicationDto = Partial<
   Pick<
     DriverApplication,
-    'reviewedBy' | 'reviewNote' | 'documents' | 'vehicle' | 'fullName' | 'cedula' | 'address' | 'whatsapp'
+    'reviewedBy' | 'reviewNote' | 'documents' | 'vehicle' | 'fullName' | 'cedula' | 'address' | 'whatsapp' | 'currentStep'
   >
 >
 
@@ -82,8 +87,8 @@ export const CreateDriverApplicationSchema = z.object({
   cedula: z.string().min(9).max(12),
   address: z.string().min(1).max(500),
   whatsapp: z.string().min(8).max(20),
-  vehicle: driverApplicationVehicleSchema,
-  documents: driverApplicationDocumentSchema
+  vehicle: driverApplicationVehicleSchema.optional(),
+  documents: driverApplicationDocumentSchema.optional()
 })
 
 export const UpdateDriverApplicationSchema = z.object({
@@ -92,10 +97,22 @@ export const UpdateDriverApplicationSchema = z.object({
   address: z.string().min(1).max(500).optional(),
   whatsapp: z.string().min(8).max(20).optional(),
   vehicle: driverApplicationVehicleSchema.optional(),
-  documents: driverApplicationDocumentSchema.optional()
+  documents: driverApplicationDocumentSchema.optional(),
+  currentStep: z.number().int().min(1).max(3).optional()
 })
 
+export const PersonalInfoSchema = z.object({
+  fullName: z.string().min(1).max(200),
+  cedula: z.string().min(9).max(12),
+  address: z.string().min(1).max(500),
+  whatsapp: z.string().min(8).max(20)
+})
+
+export const VehicleUpdateSchema = driverApplicationVehicleSchema
+
+export const DocumentsUpdateSchema = driverApplicationDocumentSchema
+
 export const UpdateApplicationStatusSchema = z.object({
-  status: z.enum(['pending', 'in_review', 'changes_requested', 'approved', 'rejected']),
+  status: z.enum(['draft', 'pending', 'in_review', 'changes_requested', 'approved', 'rejected']),
   note: z.string().max(1000).optional()
 })

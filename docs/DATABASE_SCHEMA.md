@@ -115,6 +115,23 @@ erDiagram
         boolean pendingToReview
     }
 
+    DRIVER_APPLICATIONS {
+        string id PK
+        string userId FK
+        string fullName
+        string cedula
+        string address
+        string whatsapp
+        object vehicle
+        object documents
+        enum status
+        string reviewedBy FK
+        string reviewNote
+        object[] statusHistory
+        Date createdAt
+        Date updatedAt
+    }
+
     USERS ||--o{ RIDES : "driver"
     USERS ||--o{ RIDES : "passenger"
     USERS ||--o{ CHATS : "owner/participant"
@@ -128,6 +145,8 @@ erDiagram
     RIDES ||--o{ RIDE_PARTICIPANTS : "sub-collection"
 
     CHATS ||--o{ MESSAGES : "sub-collection"
+
+    USERS ||--o| DRIVER_APPLICATIONS : "applicant"
 ```
 
 ---
@@ -320,6 +339,71 @@ Pagos por pasajero por viaje. Se almacenan como sub-colección en `rides/{rideId
 
 ---
 
+### `driver-applications`
+
+Solicitudes de registro como conductor.
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `id` | `string` | ID del documento |
+| `userId` | `string` | ID del usuario solicitante (Firebase UID) |
+| `fullName` | `string` | Nombre completo (1–200 chars) |
+| `cedula` | `string` | Número de cédula (9–12 chars) |
+| `address` | `string` | Dirección (1–500 chars) |
+| `whatsapp` | `string` | Número de WhatsApp (8–20 chars) |
+| `vehicle` | `DriverApplicationVehicle` | Información del vehículo |
+| `documents` | `DriverApplicationDocument` | URLs de documentos requeridos |
+| `status` | `DriverApplicationStatus` | Estado de la solicitud |
+| `reviewedBy` | `string?` | ID del admin que revisó |
+| `reviewNote` | `string?` | Nota de revisión (max 1000 chars) |
+| `statusHistory` | `DriverApplicationStatusHistory[]` | Historial de cambios de estado |
+| `createdAt` | `Date` | Fecha de creación |
+| `updatedAt` | `Date` | Última actualización |
+
+**`DriverApplicationStatus` (flujo de estados):**
+```
+pending → in_review → approved
+                    → changes_requested → in_review
+                    → rejected
+```
+- `pending` — Enviada, esperando revisión
+- `in_review` — En proceso de revisión
+- `changes_requested` — Se solicitaron correcciones al conductor
+- `approved` — Aprobada
+- `rejected` — Rechazada
+
+**`DriverApplicationVehicle`:**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `brand` | `string` | Marca del vehículo (1–100 chars) |
+| `model` | `string` | Modelo (1–100 chars) |
+| `year` | `number` | Año (1990 – año actual + 1) |
+| `color` | `string` | Color (1–50 chars) |
+| `plate` | `string` | Placa (1–20 chars) |
+| `availableSeats` | `number` | Asientos disponibles (1–4) |
+
+**`DriverApplicationDocument`:**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `cedulaFront` | `string` | URL — frente de la cédula |
+| `cedulaBack` | `string` | URL — reverso de la cédula |
+| `vehicleRegistration` | `string` | URL — marchamo / registro del vehículo |
+| `criminalRecord` | `string?` | URL — hoja de delincuencia (opcional) |
+| `selfie` | `string?` | URL — selfie de verificación de identidad (opcional) |
+
+**`DriverApplicationStatusHistory`:**
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `status` | `DriverApplicationStatus` | Estado al momento del cambio |
+| `changedAt` | `Date` | Fecha del cambio |
+| `changedBy` | `string` | ID del usuario que realizó el cambio |
+| `note` | `string?` | Nota adicional |
+
+---
+
 ## Shared Types
 
 ### `Location`
@@ -369,6 +453,7 @@ Snapshot del usuario embebido en `rides` y `ride-requests`.
 | Ride → Participants | 1:N | sub-colección `rides/{id}/participants` |
 | User → Ratings (dado) | 1:N | `ratings.raterId` |
 | User → Ratings (recibido) | 1:N | `ratings.targetUserId` |
+| User → DriverApplication | 1:1 | `driver-applications.userId` |
 
 ---
 
@@ -381,6 +466,7 @@ Snapshot del usuario embebido en `rides` y `ride-requests`.
 - **Mensajes:** Cifrados en reposo, 1–1000 caracteres
 - **Soft delete:** `rides`, `chats`, `ride-requests` usan `deletedAt` en lugar de borrado físico
 - **Ubicaciones:** Origin, destination y meetingPoint deben ser distintos entre sí
+- **Driver application:** Un usuario puede tener como máximo una solicitud activa (no rechazada)
 
 ---
 
