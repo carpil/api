@@ -6,6 +6,9 @@ import {
   CreateDriverApplicationSchema,
   UpdateDriverApplicationSchema,
   UpdateApplicationStatusSchema,
+  PersonalInfoSchema,
+  VehicleUpdateSchema,
+  DocumentsUpdateSchema,
   DriverApplicationStatus
 } from '@models/driver-application.model'
 
@@ -51,6 +54,43 @@ export class DriverApplicationController {
       note
     )
     res.json({ message: 'Status updated successfully' })
+  })
+
+  updatePersonalInfo = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const body = PersonalInfoSchema.parse(req.body)
+    await this.driverApplicationService.updatePersonalInfo(req.user?.uid ?? '', body)
+    res.json({ message: 'Personal info updated successfully' })
+  })
+
+  updateVehicle = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const body = VehicleUpdateSchema.parse(req.body)
+    await this.driverApplicationService.updateVehicle(req.user?.uid ?? '', body)
+    res.json({ message: 'Vehicle updated successfully' })
+  })
+
+  updateDocuments = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const body = DocumentsUpdateSchema.parse(req.body)
+    await this.driverApplicationService.updateDocuments(req.user?.uid ?? '', body)
+    res.json({ message: 'Documents updated successfully' })
+  })
+
+  uploadDocument = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const file = req.file
+    if (file == null) {
+      res.status(400).json({ message: 'No file provided' })
+      return
+    }
+    const documentType = req.body.documentType as string
+    if (documentType == null) {
+      res.status(400).json({ message: 'documentType is required' })
+      return
+    }
+    const url = await this.driverApplicationService.uploadDocument(
+      req.user?.uid ?? '',
+      documentType,
+      file
+    )
+    res.json({ url })
   })
 
   updateDriverStatus = asyncHandler(async (req: AuthRequest, res: Response) => {

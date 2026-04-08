@@ -65,6 +65,18 @@ app.get('/rides/drivers/:id', async (req: AuthRequest, res) => {
   }
 
   const rideData = rideRef.data()
+
+  const driverInfo = rideData?.driver ?? null
+  if (driverInfo?.id) {
+    const driverRef = await firestore.collection('users').doc(driverInfo.id).get()
+    if (driverRef.exists) {
+      const driverData = driverRef.data()
+      driverInfo.name = driverData?.name ?? driverInfo.name
+      driverInfo.profilePicture = driverData?.profilePicture ?? driverInfo.profilePicture
+      driverInfo.phoneNumber = driverData?.phoneNumber ?? null
+    }
+  }
+
   const ride: Ride = {
     id: rideRef.id,
     origin: rideData?.origin ?? null,
@@ -73,7 +85,7 @@ app.get('/rides/drivers/:id', async (req: AuthRequest, res) => {
     availableSeats: rideData?.availableSeats ?? 0,
     price: rideData?.price ?? 0,
     passengers: rideData?.passengers ?? [],
-    driver: rideData?.driver ?? null,
+    driver: driverInfo,
     chatId: '',
     departureDate: rideData?.departureDate?.toDate() ?? null,
     deletedAt: rideData?.deletedAt?.toDate() ?? null,
