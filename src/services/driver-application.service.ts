@@ -4,8 +4,11 @@ import { IUsersRepository } from '@interfaces/repositories.interface'
 import {
   DriverApplication,
   DriverApplicationStatus,
+  DriverApplicationVehicle,
+  DriverApplicationDocument,
   CreateDriverApplicationDto
 } from '@models/driver-application.model'
+import { uploadToStorage } from '../utils/storage'
 
 export class DriverApplicationService {
   constructor (
@@ -37,7 +40,7 @@ export class DriverApplicationService {
     dto: Omit<CreateDriverApplicationDto, 'userId'>
   ): Promise<DriverApplication> {
     const existing = await this.driverApplicationRepo.findByUserId(userId)
-    if (existing !== null && existing.status !== 'rejected') {
+    if (existing !== null && existing.status !== 'rejected' && existing.status !== 'draft') {
       throw new Error('Ya tenés una solicitud activa. Esperá a que sea procesada.')
     }
 
@@ -52,7 +55,7 @@ export class DriverApplicationService {
   ): Promise<void> {
     const existing = await this.driverApplicationRepo.findByUserId(userId)
     if (existing === null) throw new Error('Application not found')
-    if (existing.status !== 'changes_requested') {
+    if (existing.status !== 'changes_requested' && existing.status !== 'draft') {
       throw new Error('Solo podés editar tu solicitud cuando se requieren cambios.')
     }
     await this.driverApplicationRepo.update(existing.id, dto)
@@ -72,6 +75,60 @@ export class DriverApplicationService {
     if (status === 'approved') {
       await this.approveDriver(application, adminId)
     }
+  }
+
+  async updatePersonalInfo (
+    userId: string,
+    data: { fullName: string, cedula: string, address: string, whatsapp: string }
+  ): Promise<void> {
+    const existing = await this.driverApplicationRepo.findByUserId(userId)
+    if (existing === null) throw new Error('Application not found')
+    if (existing.status !== 'draft' && existing.status !== 'changes_requested') {
+      throw new Error('Solo podés editar tu solicitud en estado borrador o cambios solicitados.')
+    }
+    await this.driverApplicationRepo.updatePersonalInfo(existing.id, data)
+  }
+
+  async updateVehicle (
+    userId: string,
+    vehicle: DriverApplicationVehicle
+  ): Promise<void> {
+    const existing = await this.driverApplicationRepo.findByUserId(userId)
+    if (existing === null) throw new Error('Application not found')
+    if (existing.status !== 'draft' && existing.status !== 'changes_requested') {
+      throw new Error('Solo podés editar tu solicitud en estado borrador o cambios solicitados.')
+    }
+    await this.driverApplicationRepo.updateVehicle(existing.id, vehicle)
+  }
+
+  async updateDocuments (
+    userId: string,
+    documents: DriverApplicationDocument
+  ): Promise<void> {
+    const existing = await this.driverApplicationRepo.findByUserId(userId)
+    if (existing === null) throw new Error('Application not found')
+    if (existing.status !== 'draft' && existing.status !== 'changes_requested') {
+      throw new Error('Solo podés editar tu solicitud en estado borrador o cambios solicitados.')
+    }
+    await this.driverApplicationRepo.updateDocuments(existing.id, documents)
+  }
+
+  async uploadDocument (
+    userId: string,
+    documentType: string,
+    file: Express.Multer.File
+  ): Promise<string> {
+    const existing = await this.driverApplicationRepo.findByUserId(userId)
+    if (existing === null) throw new Error('Application not found')
+    if (existing.status !== 'draft' && existing.status !== 'changes_requested') {
+      throw new Error('Solo podés subir documentos en estado borrador o cambios solicitados.')
+    }
+
+    const extension = file.mimetype === 'application/pdf' ? 'pdf' : 'jpg'
+    const path = `driver-documents/${userId}/${existing.id}/${documentType}.${extension}`
+
+    const url = await uploadToStorage(path, file.buffer, file.mimetype)
+    return url
   }
 
   async updateDriverStatus (
