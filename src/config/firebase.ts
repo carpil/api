@@ -15,7 +15,9 @@ if (admin.apps.length === 0) {
         credential: cert(JSON.parse(process.env.FIREBASE_CONFIG))
       })
     } else {
-      admin.initializeApp()
+      admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID
+      })
     }
   }
 }
