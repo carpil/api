@@ -45,6 +45,11 @@ export class UsersController {
     const userInfo = await this.usersService.getUserInfo(req.params.userId)
     res.json(userInfo)
   })
+
+  deleteAccount = asyncHandler(async (req: AuthRequest, res: Response) => {
+    await this.usersService.deleteAccount(req.user!.uid)
+    res.json({ message: 'Account deleted successfully' })
+  })
 }
 
 
