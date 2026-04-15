@@ -3,20 +3,32 @@ import admin from 'firebase-admin'
 import { FieldValue as FirestoreFieldValue } from 'firebase-admin/firestore'
 
 if (admin.apps.length === 0) {
-  try {
-    const serviceAccount = require('./firebase-service-account.json')
+  const isEmulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST)
+
+  if (isEmulator) {
+    // Local / OSS — emulador, no se necesitan credenciales reales
     admin.initializeApp({
-      credential: cert(serviceAccount)
+      projectId: process.env.FIREBASE_PROJECT_ID ?? 'demo-carpil'
     })
-  } catch (error) {
-    console.log('Service account file not found, trying environment variables')
-    if (process.env.FIREBASE_CONFIG) {
-      admin.initializeApp({
-        credential: cert(JSON.parse(process.env.FIREBASE_CONFIG))
+  } else if (process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+    // Dev / QA / Prod — credenciales desde variables de entorno
+    admin.initializeApp({
+      credential: cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
       })
-    } else {
-      admin.initializeApp()
-    }
+    })
+  } else if (process.env.FIREBASE_CONFIG) {
+    // Dev / QA / Prod — credenciales como JSON string
+    admin.initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_CONFIG))
+    })
+  } else {
+    throw new Error(
+      'Firebase no configurado. En local asegúrate que FIRESTORE_EMULATOR_HOST esté seteado. ' +
+      'En otros ambientes provee FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY o FIREBASE_CONFIG.'
+    )
   }
 }
 

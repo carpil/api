@@ -12,6 +12,7 @@ const createUsersRouter = (usersController: UsersController) => {
   router.post('/signup/email', authenticate, (req, res, next) => usersController.signupEmail(req, res, next))
   router.post('/login', authenticate, (req, res, next) => usersController.login(req, res, next))
   router.post('/login/social', authenticate, (req, res, next) => usersController.loginSocial(req, res, next))
+  router.delete('/me', authenticate, (req, res, next) => usersController.deleteAccount(req, res, next))
 
   return router
 }

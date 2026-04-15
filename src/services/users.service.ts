@@ -6,6 +6,7 @@ import { RatingsService } from './ratings.service'
 import { RidesService } from './rides.service'
 import { UserInfo } from '@models/user-info'
 import { RideInfo } from '@models/ride-info'
+import { auth } from '../config/firebase'
 
 export class UsersService {
   constructor(
@@ -199,6 +200,20 @@ export class UsersService {
       ridesCompletedAsPassenger: rideCounts.asPassenger,
       joinedAt: user.createdAt
     }
+  }
+
+  async deleteAccount(userId: string) {
+    if (!userId) throw new HttpError(401, 'Unauthorized')
+
+    const user = await this.usersRepo.getById(userId)
+    if (!user) throw new HttpError(404, 'User not found')
+
+    if (user.currentRideId) {
+      throw new HttpError(400, 'Cannot delete account while in an active ride')
+    }
+
+    await this.usersRepo.delete(userId)
+    await auth.deleteUser(userId)
   }
 }
 
