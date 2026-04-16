@@ -106,14 +106,17 @@ export class RidesRepository implements IRidesRepository {
   }
 
   async hasActiveRide(userId: string): Promise<boolean> {
-    // Check as driver
+    // Check as driver — filter in memory to exclude soft-deleted rides (deletedAt != null)
     const driverRidesSnapshot = await firestore
       .collection('rides')
       .where('driver.id', '==', userId)
       .where('status', 'in', ACTIVE_RIDE_STATUSES)
-      .limit(1)
       .get()
-    if (!driverRidesSnapshot.empty) return true
+    const hasActiveAsDriver = driverRidesSnapshot.docs.some(doc => {
+      const ride = doc.data() as Ride
+      return ride.deletedAt == null
+    })
+    if (hasActiveAsDriver) return true
 
     // Check as passenger — Firestore doesn't support nested array field queries,
     // so we fetch all active rides and filter in memory
@@ -123,7 +126,7 @@ export class RidesRepository implements IRidesRepository {
       .get()
     return passengerRidesSnapshot.docs.some(doc => {
       const ride = doc.data() as Ride
-      return ride.passengers?.some(p => p.id === userId) ?? false
+      return ride.deletedAt == null && (ride.passengers?.some(p => p.id === userId) ?? false)
     })
   }
 
