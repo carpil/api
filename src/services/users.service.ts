@@ -208,7 +208,8 @@ export class UsersService {
     const user = await this.usersRepo.getById(userId)
     if (!user) throw new HttpError(404, 'User not found')
 
-    if (user.currentRideId || user.inRide) {
+    const hasActiveRide = await this.ridesRepo.hasActiveRide(userId)
+    if (hasActiveRide) {
       throw new HttpError(400, 'Cannot delete account while in an active ride')
     }
 
