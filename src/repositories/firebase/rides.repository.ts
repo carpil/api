@@ -4,6 +4,8 @@ import { Ride, RideStatus, UserInfo } from '@models/ride.model'
 import { IRidesRepository } from '@interfaces/repositories.interface'
 import { UsersRepository } from './users.repository'
 
+const ACTIVE_RIDE_STATUSES = [RideStatus.Active, RideStatus.InProgress, RideStatus.InRoute]
+
 export class RidesRepository implements IRidesRepository {
   constructor(private readonly usersRepo: UsersRepository) {}
   async getById(rideId: string): Promise<Ride | null> {
@@ -101,6 +103,28 @@ export class RidesRepository implements IRidesRepository {
       .get()
 
     return ratingsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+  }
+
+  async hasActiveRide(userId: string): Promise<boolean> {
+    // Check as driver
+    const driverRidesSnapshot = await firestore
+      .collection('rides')
+      .where('driver.id', '==', userId)
+      .where('status', 'in', ACTIVE_RIDE_STATUSES)
+      .limit(1)
+      .get()
+    if (!driverRidesSnapshot.empty) return true
+
+    // Check as passenger — Firestore doesn't support nested array field queries,
+    // so we fetch all active rides and filter in memory
+    const passengerRidesSnapshot = await firestore
+      .collection('rides')
+      .where('status', 'in', ACTIVE_RIDE_STATUSES)
+      .get()
+    return passengerRidesSnapshot.docs.some(doc => {
+      const ride = doc.data() as Ride
+      return ride.passengers?.some(p => p.id === userId) ?? false
+    })
   }
 
   async countCompletedRidesByUser(userId: string): Promise<{ asDriver: number, asPassenger: number }> {

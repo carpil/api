@@ -34,6 +34,7 @@ export interface IRidesRepository {
   addPassenger(rideId: string, passenger: any): Promise<void>
   setParticipant(rideId: string, userId: string, payload: { active: boolean, pendingToReview: boolean }): Promise<void>
   listPendingToReviewRidesForUser(userId: string): Promise<string[]>
+  hasActiveRide(userId: string): Promise<boolean>
 }
 
 // Chat repository interface
