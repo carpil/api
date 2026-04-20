@@ -1,9 +1,12 @@
 import { z } from 'zod'
 
+export const userRoleSchema = z.enum(['passenger', 'driver', 'admin', 'super_admin'])
+
 export const userSchema = z.object({
   id: z.string(),
   name: z.string(),
   profilePicture: z.string(),
+  role: userRoleSchema.optional(),
   email: z.string().email().optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -19,7 +22,13 @@ export const emailSignupSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   phoneNumber: z.string().length(8, 'Phone number must be exactly 8 digits').regex(/^\d{8}$/, 'Phone number must contain only digits'),
-  email: z.string().email('Valid email is required')
+  email: z.string().email('Valid email is required'),
+  role: userRoleSchema.optional()
+})
+
+export const updateProfileSchema = z.object({
+  phoneNumber: z.string().length(8, 'Phone number must be exactly 8 digits').regex(/^\d{8}$/, 'Phone number must contain only digits').optional(),
+  role: userRoleSchema.optional()
 })
 
 export const validateUser = (data: unknown) => {
