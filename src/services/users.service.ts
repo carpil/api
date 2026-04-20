@@ -51,6 +51,7 @@ export class UsersService {
       email: input.email,
       profilePicture: '',
       role: input.role ?? 'passenger',
+      profileCompleted: true,
       createdAt: new Date(),
       updatedAt: new Date()
     }
@@ -65,7 +66,10 @@ export class UsersService {
     if (!user) throw new HttpError(404, 'User not found')
 
     const updates: Partial<User> = { updatedAt: new Date() }
-    if (input.phoneNumber) updates.phoneNumber = `+506${input.phoneNumber}`
+    if (input.phoneNumber) {
+      updates.phoneNumber = `+506${input.phoneNumber}`
+      updates.profileCompleted = true
+    }
     if (input.role) updates.role = input.role
 
     await this.usersRepo.update(userId, updates)
@@ -95,6 +99,7 @@ export class UsersService {
       const toSave: User = {
         ...input,
         id: currentUser.uid,
+        profileCompleted: false,
         createdAt: new Date(),
         updatedAt: new Date()
       }
