@@ -33,7 +33,7 @@ export class UsersService {
     return toSave
   }
 
-  async signupEmail(currentUser: { uid: string, email?: string }, input: { firstName: string, lastName: string, phoneNumber: string, email: string }) {
+  async signupEmail(currentUser: { uid: string, email?: string }, input: { firstName: string, lastName: string, phoneNumber: string, email: string, role?: User['role'] }) {
     if (!currentUser?.uid) throw new HttpError(401, 'Unauthorized')
     if (currentUser.email && input.email !== currentUser.email) throw new HttpError(401, 'Unauthorized')
 
@@ -50,11 +50,26 @@ export class UsersService {
       phoneNumber: formattedPhoneNumber,
       email: input.email,
       profilePicture: '',
+      role: input.role ?? 'passenger',
       createdAt: new Date(),
       updatedAt: new Date()
     }
     await this.usersRepo.create(currentUser.uid, toSave)
     return toSave
+  }
+
+  async updateProfile(userId: string, input: { phoneNumber?: string, role?: User['role'] }) {
+    if (!userId) throw new HttpError(401, 'Unauthorized')
+
+    const user = await this.usersRepo.getById(userId)
+    if (!user) throw new HttpError(404, 'User not found')
+
+    const updates: Partial<User> = { updatedAt: new Date() }
+    if (input.phoneNumber) updates.phoneNumber = `+506${input.phoneNumber}`
+    if (input.role) updates.role = input.role
+
+    await this.usersRepo.update(userId, updates)
+    return { ...user, ...updates }
   }
 
   async login(currentUser: { uid: string, email?: string }, input: User) {
