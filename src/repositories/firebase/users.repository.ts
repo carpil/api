@@ -46,6 +46,10 @@ export class UsersRepository implements IUsersRepository {
     })
   }
 
+  async delete(userId: string): Promise<void> {
+    await firestore.collection('users').doc(userId).delete()
+  }
+
   async setDriverApplicationId (userId: string, applicationId: string): Promise<void> {
     await firestore.collection('users').doc(userId).update({
       driverApplicationId: applicationId,

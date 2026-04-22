@@ -84,7 +84,7 @@ export class RidesService {
     const ride = await this.getRideById(rideId)
     if (ride.driver.id === passengerId) throw new HttpError(400, 'You cannot join your own ride')
     if (ride.status !== RideStatus.Active) throw new HttpError(400, 'Ride is not active')
-    if (ride.availableSeats <= 0) throw new HttpError(400, 'No available seats')
+    if (ride.passengers.length >= ride.availableSeats) throw new HttpError(400, 'No available seats')
     if (ride.passengers.some((passenger: any) => passenger.id === passengerId)) throw new HttpError(400, 'You are already a passenger on this ride')
 
     const passenger = await this.usersRepo.getById(passengerId)

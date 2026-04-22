@@ -1,7 +1,7 @@
 import { Response } from 'express'
 import { asyncHandler } from '../utils/http'
 import { UsersService } from '../services/users.service'
-import { userSchema, emailSignupSchema } from '../schemas/user'
+import { userSchema, emailSignupSchema, updateProfileSchema } from '../schemas/user'
 import { AuthRequest } from '../middlewares/auth.middleware'
 
 export class UsersController {
@@ -44,6 +44,17 @@ export class UsersController {
   getUserInfo = asyncHandler(async (req: AuthRequest, res: Response) => {
     const userInfo = await this.usersService.getUserInfo(req.params.userId)
     res.json(userInfo)
+  })
+
+  updateProfile = asyncHandler(async (req: AuthRequest, res: Response) => {
+    const body = updateProfileSchema.parse(req.body)
+    const user = await this.usersService.updateProfile(req.user!.uid, body)
+    res.json({ user })
+  })
+
+  deleteAccount = asyncHandler(async (req: AuthRequest, res: Response) => {
+    await this.usersService.deleteAccount(req.user!.uid)
+    res.json({ message: 'Account deleted successfully' })
   })
 }
 

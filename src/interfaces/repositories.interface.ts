@@ -17,6 +17,7 @@ export interface IUsersRepository {
   getById(id: string): Promise<User | null>
   create(id: string, user: User): Promise<void>
   update(id: string, partial: Partial<User>): Promise<void>
+  delete(id: string): Promise<void>
   exists(id: string): Promise<boolean>
   setDriverApproved(userId: string, vehicleId: string, applicationId: string): Promise<void>
   updateDriverStatus(userId: string, status: 'active' | 'suspended' | 'blocked'): Promise<void>
@@ -33,6 +34,7 @@ export interface IRidesRepository {
   addPassenger(rideId: string, passenger: any): Promise<void>
   setParticipant(rideId: string, userId: string, payload: { active: boolean, pendingToReview: boolean }): Promise<void>
   listPendingToReviewRidesForUser(userId: string): Promise<string[]>
+  hasActiveRide(userId: string): Promise<boolean>
 }
 
 // Chat repository interface

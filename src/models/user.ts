@@ -1,7 +1,10 @@
+export type UserRole = 'passenger' | 'driver' | 'admin' | 'super_admin'
+
 export interface User {
   id: string
   name: string
   profilePicture: string
+  role?: UserRole
   email?: string
   firstName?: string
   lastName?: string
