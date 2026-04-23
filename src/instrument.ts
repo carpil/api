@@ -5,10 +5,6 @@ dotenv.config()
 dotenv.config({ path: '.env.local' })
 
 import * as Sentry from '@sentry/node'
+import { sentryConfig } from './config/sentry'
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  // RAILWAY_ENVIRONMENT_NAME is injected by Railway automatically ('development' | 'staging' | 'production')
-  environment: process.env.RAILWAY_ENVIRONMENT_NAME ?? process.env.NODE_ENV ?? 'development',
-  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-})
+Sentry.init(sentryConfig)
