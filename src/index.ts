@@ -1,8 +1,6 @@
+import './instrument'
+import * as Sentry from '@sentry/node'
 import express from 'express'
-import dotenv from 'dotenv'
-dotenv.config()
-
-dotenv.config({ path: '.env.local' })
 
 import { authenticate, AuthRequest } from '@middlewares/auth.middleware'
 import { firestore } from 'config/firebase'
@@ -1181,6 +1179,8 @@ app.get('/rides/:id/ratings/pending', authenticate, async (req: AuthRequest, res
     res.status(500).json({ message: 'Internal server error' })
   }
 })
+
+Sentry.setupExpressErrorHandler(app)
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
